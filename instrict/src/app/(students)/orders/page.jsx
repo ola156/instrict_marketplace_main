@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShoppingBag, Clock, CheckCircle2, XCircle, Truck, Store, ChevronRight } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
 
 function timeAgo(d) {
   const s = (Date.now() - new Date(d)) / 1000;
@@ -26,10 +28,6 @@ const statusConfig = {
 const activeStatuses  = ['pending','confirmed','preparing','ready'];
 const doneStatuses    = ['picked_up','delivered','cancelled'];
 
-// Every card — active or history — is a link into the live tracking page.
-// This is the one place status updates actually stream in real time, so
-// clicking a pending order takes you straight to its current state, not
-// a stale snapshot from list-load time.
 function OrderCard({ order, isNew, onOpen }) {
   const cfg = statusConfig[order.status] || statusConfig.pending;
   const Icon = cfg.icon;
@@ -66,7 +64,7 @@ function OrderCard({ order, isNew, onOpen }) {
   );
 }
 
-export default function OrdersPage() {
+function OrdersContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,8 +77,6 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
 
-    // Real-time order status updates — keeps the list badges (status,
-    // active-count) current even while sitting on this page.
     const channel = supabase
       .channel('student-orders')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => fetchOrders())
@@ -99,8 +95,6 @@ export default function OrdersPage() {
       .eq('user_id', user.id)
       .single();
 
-    // Match on requester_id too, so orders placed without a student
-    // profile still show up here instead of vanishing from history.
     let query = supabase
       .from('orders')
       .select(`
@@ -131,7 +125,6 @@ export default function OrdersPage() {
         <p className="text-[11px] text-slate-400 mt-0.5">Track and manage your orders</p>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
         {[['active','Active'], ['history','History']].map(([key, label]) => (
           <button
@@ -190,5 +183,13 @@ export default function OrdersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrdersContent />
+    </Suspense>
   );
 }
