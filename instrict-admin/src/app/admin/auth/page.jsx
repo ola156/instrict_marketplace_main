@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { ShieldAlert, Mail, Lock, ArrowRight, HelpCircle, Loader2 } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Enter a valid email address' }),
@@ -25,7 +27,7 @@ const oauthErrorMessages = {
   access_rejected: 'Your admin access has been rejected. Contact engineering.',
 };
 
-export default function AdminAuth() {
+function AdminAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -299,5 +301,13 @@ export default function AdminAuth() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function AdminAuth() {
+  return (
+    <Suspense fallback={null}>
+      <AdminAuthContent />
+    </Suspense>
   );
 }

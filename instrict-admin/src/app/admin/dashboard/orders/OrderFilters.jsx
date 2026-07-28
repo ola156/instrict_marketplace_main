@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivered', 'cancelled'];
 const FULFILLMENT_TYPES = ['pickup', 'delivery'];
 
-export default function OrderFilters({ vendors }) {
+function OrderFiltersInner({ vendors }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -72,5 +73,13 @@ export default function OrderFilters({ vendors }) {
         </button>
       )}
     </div>
+  );
+}
+
+export default function OrderFilters({ vendors }) {
+  return (
+    <Suspense fallback={null}>
+      <OrderFiltersInner vendors={vendors} />
+    </Suspense>
   );
 }
