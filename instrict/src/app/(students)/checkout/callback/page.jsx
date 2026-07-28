@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, XCircle } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 function CallbackContent() {
   const params = useSearchParams();
   const router = useRouter();
@@ -17,7 +19,7 @@ function CallbackContent() {
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.orderId) {
-          router.replace(`/orders/${data.orderId}`); // straight to tracking, no click needed
+          router.replace(`/orders/${data.orderId}`);
         } else {
           setState('failed');
         }
@@ -59,4 +61,4 @@ export default function CheckoutCallbackPage() {
       <CallbackContent />
     </Suspense>
   );
-}export const dynamic = 'force-dynamic';
+}
