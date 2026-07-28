@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, XCircle } from 'lucide-react';
 
-export default function CheckoutCallbackPage() {
+function CallbackContent() {
   const params = useSearchParams();
   const router = useRouter();
   const [state, setState] = useState('verifying'); // verifying | failed
@@ -43,5 +43,20 @@ export default function CheckoutCallbackPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function CheckoutCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-sm font-bold text-slate-500">Loading payment status…</p>
+        </div>
+      }
+    >
+      <CallbackContent />
+    </Suspense>
   );
 }
