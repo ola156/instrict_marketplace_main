@@ -59,4 +59,4 @@ export default function CheckoutCallbackPage() {
       <CallbackContent />
     </Suspense>
   );
-}
+}export const dynamic = 'force-dynamic';
