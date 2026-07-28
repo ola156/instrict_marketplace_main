@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, XCircle } from 'lucide-react';
 
-export default function ErrandPaymentCallbackPage() {
+export const dynamic = 'force-dynamic';
+
+function ErrandPaymentCallbackContent() {
   const params = useSearchParams();
   const router = useRouter();
   const [state, setState] = useState('verifying');
@@ -40,5 +42,20 @@ export default function ErrandPaymentCallbackPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ErrandPaymentCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-sm font-bold text-slate-500">Loading payment status…</p>
+        </div>
+      }
+    >
+      <ErrandPaymentCallbackContent />
+    </Suspense>
   );
 }
