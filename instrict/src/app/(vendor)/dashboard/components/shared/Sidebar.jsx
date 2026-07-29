@@ -27,7 +27,7 @@ const canteenNav = [
   { label: 'Notifications',   icon: Bell,             section: 'notifications' },
   { label: 'Community',       icon: Rss,              section: 'community' },
   { label: 'Settings',        icon: Settings,         section: 'settings' },
-  { label: 'Help & Support',        icon: MessageCircle,         section: 'help' },
+ 
 ];
 
 const retailNav = [
@@ -38,7 +38,6 @@ const retailNav = [
   { label: 'Notifications',   icon: Bell,             section: 'notifications' },
   { label: 'Community',       icon: Rss,              section: 'community' },
   { label: 'Settings',        icon: Settings,         section: 'settings' },
-  { label: 'Help & Support',        icon: MessageCircle,         section: 'help' },
 ];
 const serviceFixedNav = [
   { label: 'Overview',      icon: LayoutDashboard, section: 'overview' },
@@ -49,7 +48,6 @@ const serviceFixedNav = [
   { label: 'Notifications', icon: Bell,            section: 'notifications' },
   { label: 'Community',     icon: Rss,             section: 'community' },
   { label: 'Settings',      icon: Settings,        section: 'settings' },
-  { label: 'Help & Support',      icon: MessageCircle,        section: 'help' },
 ];
 
 const serviceVariableNav = [
@@ -59,8 +57,7 @@ const serviceVariableNav = [
   { label: 'Wallet',        icon: Wallet,          section: 'wallet' },
   { label: 'Notifications', icon: Bell,            section: 'notifications' },
   { label: 'Community',     icon: Rss,             section: 'community' },
-  { label: 'Settings',      icon: Settings,        section: 'settings' },
-  { label: 'Help & Support',      icon: MessageCircle,        section: 'help' }, 
+  { label: 'Settings',      icon: Settings,        section: 'settings' }, 
 ];
 
 export default function Sidebar({ category, activeSection, serviceSubtype, onSectionChange, vendorName }) {

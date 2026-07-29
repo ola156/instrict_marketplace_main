@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import ImageUpload from '@/app/(vendor)/dashboard/components/shared/ImageUpload';
 import { User, Hash, MapPin, Phone, Save, CheckCircle2, LogOut, ShoppingBag, MessageSquare, Building2 } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const inputClass = "w-full h-10 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all";
 
@@ -264,7 +265,13 @@ export default function ProfilePage() {
             </select>
           </div>
         </div>
-
+<div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 flex items-center justify-between">
+  <div>
+    <p className="text-xs font-black text-slate-900 dark:text-white">Appearance</p>
+    <p className="text-[11px] text-slate-400 mt-0.5">Light or dark mode</p>
+  </div>
+  <ThemeToggle />
+</div>
         {saveError && (
           <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/20 rounded-xl px-3 py-2.5">
             <span className="text-rose-500 text-sm leading-none mt-0.5">⚠</span>

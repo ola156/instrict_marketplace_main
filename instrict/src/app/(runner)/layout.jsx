@@ -1,10 +1,10 @@
-// app/(runner)/layout.js
 import { RunnerProvider } from './context/RunnerProvider';
 import RunnerSidebar from './components/RunnerSidebar';
 import RunnerBottomNav from './components/RunnerBottomNav';
 import RunnerMobileTopBar from './components/RunnerMobileTopBar';
 import RunnerVerificationBanner from './components/RunnerVerificationBanner';
 import RunnerMainContent from './components/RunnerMainContent';
+import RunnerHelpButton from './components/RunnerHelpButton';
 
 export default function RunnerLayout({ children }) {
   return (
@@ -17,6 +17,7 @@ export default function RunnerLayout({ children }) {
           <RunnerMainContent>{children}</RunnerMainContent>
         </div>
         <RunnerBottomNav />
+        <RunnerHelpButton />
       </div>
     </RunnerProvider>
   );

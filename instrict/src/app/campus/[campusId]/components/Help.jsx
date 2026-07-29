@@ -45,7 +45,7 @@ export function LandingHelpCenter() {
           <AccordionItem 
             key={idx} 
             value={`item-${idx}`}
-            className="group/item border border-border/50 rounded-xl px-5 sm:px-6 bg-card/40 backdrop-blur-md transition-all duration-300 data-[state=open]:border-primary/30 data-[state=open]:shadow-md data-[state=open]:bg-gradient-to-r data-[state=open]:from-primary/[0.02] data-[state=open]:via-transparent data-[state=open]:to-transparent overflow-hidden"
+            className="group/item rounded-xl px-5 sm:px-6 bg-card/40 backdrop-blur-md transition-all duration-300 data-[state=open]:border-primary/30 data-[state=open]:shadow-md data-[state=open]:bg-gradient-to-r data-[state=open]:from-primary/[0.02] data-[state=open]:via-transparent data-[state=open]:to-transparent overflow-hidden"
           >
             <AccordionTrigger className="text-left font-bold text-sm sm:text-base text-foreground hover:no-underline py-4.5 sm:py-5 tracking-tight group-hover/item:text-primary transition-colors duration-200 data-[state=open]:text-primary [&[data-state=open]>svg]:rotate-180">
               <span className="pr-4 leading-snug">{item.q}</span>

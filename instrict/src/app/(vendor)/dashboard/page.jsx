@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Ban } from 'lucide-react';
 import Sidebar from './components/shared/Sidebar';
+import VendorHelpButton from './components/shared/VendorHelpButton';
 import CanteenDashboard from './components/canteen/CanteenDashboard';
 import RetailDashboard from './components/retail/RetailDashboard';
 import FixedServiceDashboard from './components/service-fixed/FixedServiceDashboard';
@@ -43,10 +44,6 @@ usePushNotifications(vendor?.user_id, { table: 'vendor_profiles', idColumn: 'use
 
   const handleVendorUpdate = (updatedVendor) => setVendor(updatedVendor);
 
-  // Realtime: pick up a suspension/reactivation applied by an admin while
-  // the vendor is sitting on the dashboard, without requiring a refresh.
-  // Admin mutations go through the service-role client in campus-admin,
-  // so this is the only way the vendor side finds out mid-session.
   const handleRealtimeUpdate = useCallback((payload) => {
     setVendor((prev) => (prev ? { ...prev, ...payload.new } : prev));
   }, []);
@@ -134,9 +131,9 @@ usePushNotifications(vendor?.user_id, { table: 'vendor_profiles', idColumn: 'use
         vendorName={vendor.legal_name}
       />
       <div className="flex-1 flex flex-col">
-
         {renderDashboard()}
       </div>
+      <VendorHelpButton />
     </div>
   );
 }

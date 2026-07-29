@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import ImageUpload, { ImagePlaceholder } from './ImageUpload';
-import { Store, Phone, Clock, MapPin, Save, CheckCircle2, Building2 } from 'lucide-react';
+import { Store, Phone, Clock, MapPin, Save, CheckCircle2, Building2, Moon } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 function Section({ title, description, children }) {
   return (
@@ -348,6 +349,16 @@ export default function VendorSettings({ vendor, onUpdate }) {
                 <p className="text-[11px] text-slate-400">Toggle from the top bar</p>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-400">
+    <Moon className="w-4 h-4" />
+  </div>
+  <div className="flex-1">
+    <p className="text-xs font-black text-slate-900 dark:text-white">Appearance</p>
+    <p className="text-[11px] text-slate-400">Light or dark mode</p>
+  </div>
+  <ThemeToggle />
+</div>
           </div>
         </div>
       </div>

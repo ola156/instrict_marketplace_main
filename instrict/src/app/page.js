@@ -16,6 +16,7 @@ import {
 import { useCampusStore } from "@/store/useCampusStore";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 // Only this campus is actually live right now. Every other row that comes
 // back from the campuses table is still shown (so people can see their
@@ -124,20 +125,41 @@ export default function CampusEntry() {
 
         {/* Floating Glassmorphic Top Bar */}
         <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
-          <div className="flex items-center gap-2 font-black tracking-tight text-xl text-foreground">
-            <Sparkles className="h-5 w-5 text-primary fill-primary/10" />
-            <span>Instrict<span className="text-primary">.</span></span>
+          <div className="flex items-center gap-1 font-black tracking-tight text-xl text-foreground">
+             <div className="relative h-6 w-6 overflow-hidden rounded-md flex items-center justify-center transition-transform duration-500 group-hover:rotate-[15deg]">
+                                             <Image
+                                               src="/logo.svg" 
+                                               alt="Instrict Logo" 
+                                               width={20} 
+                                               height={18} 
+                                               className="object-contain"
+                                             />
+                                           </div> 
+            <span className="text-xl">Instrict<span className="text-primary">Marketplace</span></span>
           </div>
 
           <motion.button
-            onClick={toggleTheme}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="p-2 rounded-full border border-border/40 bg-background/60 backdrop-blur-md shadow-sm text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </motion.button>
+  onClick={toggleTheme}
+  className="relative flex items-center w-14 h-8 rounded-full border border-border/40 bg-background/60 backdrop-blur-md shadow-sm px-1 transition-colors"
+  aria-label="Toggle theme"
+>
+  {/* Track icons (static, sit behind the sliding thumb) */}
+  <Sun className="absolute left-1.5 w-3.5 h-3.5 text-amber-400" />
+  <Moon className="absolute right-1.5 w-3.5 h-3.5 text-indigo-300" />
+
+  {/* Sliding thumb */}
+  <motion.div
+    className="w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center z-10"
+    animate={{ x: theme === "dark" ? 24 : 0 }}
+    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+  >
+    {theme === "dark" ? (
+      <Moon className="w-3.5 h-3.5 text-indigo-400" />
+    ) : (
+      <Sun className="w-3.5 h-3.5 text-amber-500" />
+    )}
+  </motion.div>
+</motion.button>
         </div>
 
         {/* Interactive Form Container */}

@@ -1,4 +1,3 @@
-// middleware.js (replace your existing one)
 import { updateSession } from '@/utils/supabase/middleware';
 import { NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
@@ -9,26 +8,16 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Auth-specific routes get stricter limiting
-const authLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(20, '10 m'), // was 5
-  prefix: 'rl:auth',
-});
-
-// General limiter for everything else
+// Only rate-limit real backend actions, never page views
 const generalLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(60, '1 m'),
+  limiter: Ratelimit.slidingWindow(120, '1 m'), // generous — this is now a safety net, not a gate
   prefix: 'rl:general',
 });
 
-// Routes that count as auth actions
-const AUTH_ROUTES = [
-  '/auth/callback',
-  '/auth/reset-password',
-  // remove the page routes — they're just UI, not actions
-];
+// Only your OWN API routes that do real mutations (not Supabase's own
+// endpoints — those are rate-limited by Supabase already)
+const RATE_LIMITED_PREFIXES = ['/api/'];
 
 function getIp(request) {
   return (
@@ -40,9 +29,7 @@ function getIp(request) {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  const ip = getIp(request);
 
-  // Skip rate limiting for static assets
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
@@ -51,35 +38,22 @@ export async function middleware(request) {
     return await updateSession(request);
   }
 
-  // Apply stricter auth limiter on auth routes
-  const isAuthRoute = AUTH_ROUTES.some(route => pathname.startsWith(route));
-  const limiter = isAuthRoute ? authLimiter : generalLimiter;
-  const identifier = `${ip}:${pathname}`;
+  const needsLimit = RATE_LIMITED_PREFIXES.some(p => pathname.startsWith(p));
 
-  const { success, limit, remaining, reset } = await limiter.limit(identifier);
+  if (needsLimit) {
+    const ip = getIp(request);
+    const identifier = `${ip}:${pathname}`;
+    const { success } = await generalLimiter.limit(identifier);
 
-  if (!success) {
-    // Return JSON for API routes, HTML for page routes
-    if (pathname.startsWith('/api/')) {
+    if (!success) {
       return NextResponse.json(
         { error: 'Too many requests. Please slow down and try again.' },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': String(limit),
-            'X-RateLimit-Remaining': String(remaining),
-            'X-RateLimit-Reset': String(reset),
-            'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
-          },
-        }
+        { status: 429 }
       );
     }
-
-    // For page routes, redirect to a rate-limit error page
-    return NextResponse.redirect(new URL('/too-many-requests', request.url));
   }
 
-  // Not rate limited — continue with session refresh
+  // Page routes (including all /auth/* pages) just get session refresh — no rate limiting
   return await updateSession(request);
 }
 

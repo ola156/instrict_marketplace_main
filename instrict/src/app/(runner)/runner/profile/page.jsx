@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRunner } from '../../context/RunnerProvider';
 import { User, Phone, Bike, ShieldCheck, ShieldAlert, BadgeCheck, Loader2, Save } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const cardClass = "rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4";
 const inputClass = "w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-500";
@@ -103,11 +104,13 @@ export default function RunnerProfile() {
 
   return (
     <main className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 pb-10">
-      <div className="sticky top-0 z-10 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-900 px-5 py-4">
-        <h1 className="text-sm font-black tracking-tight">Profile</h1>
-        <p className="text-[11px] text-slate-400">Your rider details</p>
-      </div>
-
+     <div className="sticky top-0 z-10 bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-900 px-5 py-4 flex items-center justify-between">
+  <div>
+    <h1 className="text-sm font-black tracking-tight">Profile</h1>
+    <p className="text-[11px] text-slate-400">Your rider details</p>
+  </div>
+  <ThemeToggle />
+</div>
       <div className="px-5 py-4 max-w-lg md:max-w-2xl mx-auto space-y-4">
         {error && (
           <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3">
