@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useCartStore } from '@/store/useCartStore';
 import CheckoutBasket from '@/components/cart/CheckoutBasket';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
+import HelpDesk from '@/components/HelpDesk';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   Home, ShoppingBag, User, Bell, LogOut,
@@ -21,7 +22,6 @@ const navTabs = [
   { name: 'Orders',    href: '/orders',    icon: ShoppingBag },
   { name: 'Errands',   href: '/errands',   icon: Bike },
   { name: 'Profile',   href: '/profile',   icon: User },
-  { name: 'Support',   href: '/help',   icon: MessageCircle },
 ];
 
 export default function StudentLayout({ children }) {
@@ -33,11 +33,10 @@ export default function StudentLayout({ children }) {
 
   const [mobileCartOpen, setMobileCartOpen]   = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showHelpDesk, setShowHelpDesk] = useState(false);
   const [profile, setProfile] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // student_profiles has its own `id` PK separate from `user_id`,
-  // so we need profile.id (fetched below), not the auth user id.
   usePushNotifications(profile?.id, { table: 'student_profiles', idColumn: 'id' });
 
   useEffect(() => { fetchProfile(); fetchUnread(); }, []);
@@ -139,6 +138,26 @@ export default function StudentLayout({ children }) {
             </div>
             <div className="flex-1 p-4 overflow-hidden">
               <CheckoutBasket isMobile={true} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Help Desk panel ── */}
+      {showHelpDesk && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center lg:justify-end">
+          <div onClick={() => setShowHelpDesk(false)} className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
+          <div className="relative w-full lg:w-[420px] lg:mr-6 max-h-[85vh] lg:max-h-[80vh] lg:mb-6 bg-white dark:bg-slate-950 rounded-t-3xl lg:rounded-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom lg:slide-in-from-bottom-4 duration-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-900 shrink-0">
+              <span className="text-xs font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-blue-500" /> Support
+              </span>
+              <button onClick={() => setShowHelpDesk(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto">
+              <HelpDesk authorType="student" />
             </div>
           </div>
         </div>
@@ -292,6 +311,15 @@ export default function StudentLayout({ children }) {
           })}
         </div>
       </nav>
+
+      {/* ── Floating support button ── */}
+      <button
+        onClick={() => { setShowHelpDesk(true); setShowNotifications(false); }}
+        aria-label="Support"
+        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </button>
     </div>
   );
 }

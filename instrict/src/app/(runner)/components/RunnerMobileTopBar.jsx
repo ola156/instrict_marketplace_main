@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageCircle, MessageSquare, Bell } from 'lucide-react';
+import Link from 'next/link';
+import { MessageSquare, Bell } from 'lucide-react';
 import Image from 'next/image';
 import { useRunner } from '../context/RunnerProvider';
 
@@ -10,7 +10,6 @@ export default function RunnerMobileTopBar() {
   const pathname = usePathname();
   const { showNotifications, toggleNotifications, unreadCount } = useRunner();
   const isCommunityActive = pathname === '/runner/community' || pathname.startsWith('/runner/community/');
-  const isSupportActive = pathname === '/runner/help' || pathname.startsWith('/runner/help/');
 
   return (
     <header className="md:hidden sticky top-0 z-40 w-full bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-900 px-4 py-3 flex items-center justify-between">
@@ -37,17 +36,6 @@ export default function RunnerMobileTopBar() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
           )}
         </button>
-
-        <Link
-          href="/runner/help"
-          className={`p-2 rounded-xl transition-colors ${
-            isSupportActive
-              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <MessageCircle className="w-5 h-5" />
-        </Link>
 
         <Link
           href="/runner/community"
