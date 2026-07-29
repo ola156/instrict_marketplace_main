@@ -12,7 +12,7 @@ const redis = new Redis({
 // Auth-specific routes get stricter limiting
 const authLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, '10 m'),
+  limiter: Ratelimit.slidingWindow(20, '10 m'), // was 5
   prefix: 'rl:auth',
 });
 
@@ -25,11 +25,9 @@ const generalLimiter = new Ratelimit({
 
 // Routes that count as auth actions
 const AUTH_ROUTES = [
-  '/auth/vendor',
-  '/auth/student',
-  '/auth/rider',
   '/auth/callback',
   '/auth/reset-password',
+  // remove the page routes — they're just UI, not actions
 ];
 
 function getIp(request) {
