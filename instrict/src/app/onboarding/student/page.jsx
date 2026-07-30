@@ -662,14 +662,7 @@ export default function UserOnboarding() {
                       Didn't get code? Resend
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleSkipVerification}
-                      disabled={isLoading}
-                      className="text-[11px] text-slate-400 hover:text-blue-500 font-bold transition-colors"
-                    >
-                      Skip for now
-                    </button>
+                    
                   </div>
                 </form>
               )}

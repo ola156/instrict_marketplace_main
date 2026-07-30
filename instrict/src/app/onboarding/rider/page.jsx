@@ -529,18 +529,7 @@ export default function RiderOnboarding() {
                   <ArrowLeft className="w-3.5 h-3.5" /> Back
                 </button>
 
-                {/* DEV ONLY — remove this button and SKIP_VERIFICATION_ENABLED
-                    once real OTP delivery is confirmed working end to end. */}
-                {SKIP_VERIFICATION_ENABLED && (
-                  <button
-                    type="button"
-                    onClick={handleSkipVerification}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 border border-dashed border-amber-400/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-50"
-                  >
-                    Skip for now (dev)
-                  </button>
-                )}
+               
               </div>
 
               <div>
