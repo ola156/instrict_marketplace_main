@@ -2,55 +2,54 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ShoppingBag, MapPin, Bike, Store, 
-  PackageCheck, CreditCard, ShieldCheck, 
-  TrendingUp, Layers
+import {
+  ShoppingBag, MapPin, Bike, Store,
+  PackageCheck, CreditCard, ShieldCheck,
+  TrendingUp
 } from 'lucide-react';
 
 const WORKFLOWS = {
-  customer: {
-    tag: "Users",
+  student: {
+    tag: 'Students',
     steps: [
-      { icon: MapPin, stepNum: "01", label: "Set Target Coordinates", context: "LOCATION SYNC", desc: "Pin your exact lecture hall theater, hostel common room, or department corridor to anchor delivery routing algorithms." },
-      { icon: ShoppingBag, stepNum: "02", label: "Broadcast Errand Parameters", context: "PAYLOAD MANIFEST", desc: "Browse real-time digital canteen inventory pools or instantiate a customized custom peer-to-peer manifest request." },
-      { icon: Bike, stepNum: "03", label: "Live Escrow Settlement", context: "SECURE TRANSFER", desc: "Monitor dispatch tracking metrics on the canvas grid. Funds are held securely in network escrow until you confirm drop-off." }
+      { icon: MapPin, stepNum: '01', label: 'Set your delivery location', desc: 'Choose your campus and pin your hostel, hall, or department, so vendors and riders know exactly where to bring your order.' },
+      { icon: ShoppingBag, stepNum: '02', label: 'Browse and order', desc: 'Pick from canteens, retail shops, and campus services, add items to your cart, and check out in one place.' },
+      { icon: Bike, stepNum: '03', label: 'Track your delivery', desc: 'Pay securely with Paystack, then track your order until a rider picks it up and drops it at your location.' }
     ]
   },
-  merchant: {
-    tag: "Merchant",
+  vendor: {
+    tag: 'Vendors',
     steps: [
-      { icon: Store, stepNum: "01", label: "Configure Inventory Architecture", context: "NODE REGISTRATION", desc: "Provision your active menu structures, initialize stock parameters, and toggle live procurement limits." },
-      { icon: ShieldCheck, stepNum: "02", label: "Verify Incoming Pipelines", context: "SECURE INTAKE", desc: "Intercept real-time purchase requests bound directly to verified student matrix profile identities." },
-      { icon: CreditCard, stepNum: "03", label: "Automated Capital Split", context: "CLEARANCE CORRIDOR", desc: "Execute transactions cleanly through integrated clearing tracks for automated wallet clearance splits." }
+      { icon: Store, stepNum: '01', label: 'Set up your store', desc: 'Add your menu or products, set stock and opening hours, and choose the campus zones you deliver to.' },
+      { icon: ShieldCheck, stepNum: '02', label: 'Get verified', desc: 'Complete verification so students can order from you and riders can pick up your deliveries.' },
+      { icon: CreditCard, stepNum: '03', label: 'Receive orders and get paid', desc: 'Accept incoming orders from students, fulfil them, and get your earnings paid out to your vendor wallet.' }
     ]
   },
   rider: {
-    tag: "Rider",
+    tag: 'Riders',
     steps: [
-      { icon: Bike, stepNum: "01", label: "Initialize Network Presence", context: "FLEET TELEMETRY", desc: "Toggle telemetry to active across the distributed local cluster to index nearby unassigned terminal runs." },
-      { icon: PackageCheck, stepNum: "02", label: "Claim Node Obligations", context: "BOUNTY PIPELINE", desc: "Review algorithmic performance metrics: check clear-out payouts, pickup windows, and vector routes." },
-      { icon: TrendingUp, stepNum: "03", label: "Trigger Payout Clearances", context: "ASSET SETTLEMENT", desc: "Complete delivery drops securely past terminal thresholds to trigger instant 85% split metrics directly to wallet." }
+      { icon: ShieldCheck, stepNum: '01', label: 'Get verified', desc: 'Complete rider verification before you can start accepting delivery runs.' },
+      { icon: PackageCheck, stepNum: '02', label: 'Go online and accept runs', desc: 'See available deliveries near you, accept the ones that fit your route, and pick up from the vendor.' },
+      { icon: TrendingUp, stepNum: '03', label: 'Deliver and get paid', desc: 'Drop off the order and your earnings land in your rider wallet. Withdraw whenever you\'re ready.' }
     ]
   }
 };
 
-export default function BorderlessStepSwitcher() {
-  const [activeRole, setActiveRole] = useState('customer');
+export default function HowItWorks() {
+  const [activeRole, setActiveRole] = useState('student');
 
   return (
     <section className="w-full max-w-6xl mx-auto px-6 py-8 sm:py-16 relative antialiased text-foreground bg-background">
-      
-      {/* Navigation and Title Header */}
+
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-16 sm:mb-24">
         <div className="space-y-2">
-         
           <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-            System Operations Framework
+            How Instrict Works
           </h2>
         </div>
 
-        {/* Minimal Typographic Switcher */}
+        {/* Role switcher */}
         <div className="flex items-center gap-2 border-b border-border/40 pb-1 self-start md:self-auto max-w-full overflow-x-auto scrollbar-none">
           {Object.entries(WORKFLOWS).map(([key, data]) => {
             const isActive = activeRole === key;
@@ -66,7 +65,7 @@ export default function BorderlessStepSwitcher() {
                   <motion.div
                     layoutId="borderlessLine"
                     className="absolute bottom-[-5px] left-0 right-0 h-[2px] bg-primary"
-                    transition={{ type: "spring", stiffness: 240, damping: 24 }}
+                    transition={{ type: 'spring', stiffness: 240, damping: 24 }}
                   />
                 )}
                 <span>{data.tag}</span>
@@ -76,9 +75,8 @@ export default function BorderlessStepSwitcher() {
         </div>
       </div>
 
-      {/* Steps Component Track */}
+      {/* Steps */}
       <div className="relative">
-        {/* Desktop Process Line Indicator (Connecting line behind data) */}
         <div className="hidden md:block absolute top-7 left-4 right-4 h-[1px] bg-border/40 z-0" />
 
         <AnimatePresence mode="wait">
@@ -87,34 +85,27 @@ export default function BorderlessStepSwitcher() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 lg:gap-12 relative z-10"
           >
             {WORKFLOWS[activeRole].steps.map((step, idx) => {
               const Icon = step.icon;
               return (
                 <div key={idx} className="relative flex flex-row md:flex-col items-start gap-6 md:gap-5 group">
-                  
-                  {/* Left Line Accent - Appears strictly on mobile to group information vertically */}
+
                   <div className="block md:hidden absolute left-3.5 top-8 bottom-[-32px] w-[1px] bg-border/40 last:hidden" />
 
-                  {/* Operational Icon Node */}
                   <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-muted flex items-center justify-center border border-border/60 group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-300 relative z-10">
                     <Icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors stroke-[2]" />
                   </div>
 
-                  {/* Informational Data Block */}
                   <div className="space-y-2 pt-0.5 md:pt-2">
-                    
-                    {/* Index Metric Counters */}
                     <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider font-bold">
                       <span className="text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                         {step.stepNum}
                       </span>
-                     
                     </div>
 
-                    {/* Step Typography Details */}
                     <div className="space-y-1.5">
                       <h3 className="text-base font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                         {step.label}
@@ -123,7 +114,6 @@ export default function BorderlessStepSwitcher() {
                         {step.desc}
                       </p>
                     </div>
-
                   </div>
 
                 </div>

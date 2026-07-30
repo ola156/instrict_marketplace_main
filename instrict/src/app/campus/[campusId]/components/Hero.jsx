@@ -12,22 +12,22 @@ export default function HeroSection() {
     {
       icon: <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
       title: "Students",
-      desc: "Buy, sell, and trade tech, textbooks, and apparel with verified students on your campus. Sign up to start trading.",
-      action: "Sign up as a Student",
+      desc: "Order from canteens and campus shops, book services, and get it delivered to your hostel or department.",
+      action: "Get started as a student",
       href: "/auth/student"
     },
     {
       icon: <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />,
       title: "Vendors & Freelancers",
-      desc: "List your services — design, photography, printing, and more — and reach students actively looking for what you offer.",
-      action: "Sign up as a Vendor",
+      desc: "List your canteen, shop, or service and reach students on your campus who are already ordering.",
+      action: "Register your business",
       href: "/auth/vendor"
     },
     {
       icon: <Bike className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
       title: "Riders",
-      desc: "Pick up delivery runs around campus on your schedule and get paid for every trip you make.",
-      action: "Sign up as a Rider",
+      desc: "Pick up delivery runs between classes, on your own schedule, and get paid out fast.",
+      action: "Start riding",
       href: "/auth/rider"
     }
   ];
@@ -58,8 +58,8 @@ export default function HeroSection() {
             </div>
 
             {/* Welcome Headline */}
-            <h1 className="text-5xl sm:text-5xl md:text-6xl font-black tracking-[-0.05em] leading-[0.85] text-slate-950 dark:text-white max-w-4xl animate-[slideUp_0.8s_cubic-bezier(0.16,1,0.3,1)_0.1s_both]">
-              Welcome to your{campus ? ` ${campus} ` : ' '} <br />
+            <h1 className="text-5xl sm:text-5xl md:text-6xl capitalize font-black tracking-[-0.05em] leading-[0.85] text-slate-950 dark:text-white max-w-4xl animate-[slideUp_0.8s_cubic-bezier(0.16,1,0.3,1)_0.1s_both]">
+              Welcome to your <span className='uppercase'>{campus ? ` ${campus} ` : ' '}</span> <br />
               <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-slate-400 bg-clip-text text-transparent dark:from-blue-400 dark:via-indigo-300 dark:to-slate-700">
                 campus Ecosystem.
               </span>
@@ -77,12 +77,12 @@ export default function HeroSection() {
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Platform State Telemetry</p>
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Active Node Users</span>
-                  <span className="font-mono font-bold">10k+</span>
+                  <span className="text-slate-500">Active Users</span>
+                  <span className="font-mono font-bold"></span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Verified Transactions</span>
-                  <span className="font-mono font-bold">25,482</span>
+                  <span className="font-mono font-bold"></span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Network Operational Latency</span>
