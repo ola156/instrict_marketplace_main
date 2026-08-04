@@ -15,6 +15,11 @@ const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 // the actual amount charged, this is only used to render the button label.
 const ERRAND_SERVICE_CHARGE_PERCENT = 3;
 
+// Statuses that belong on the "Active" tab (still in progress / on the
+// open marketplace). Everything else (completed, cancelled) goes on the
+// "Completed" tab.
+const ACTIVE_STATUSES = ['pending_payment', 'open', 'claimed'];
+
 function timeAgo(d) {
   const s = (Date.now() - new Date(d)) / 1000;
   if (s < 60) return 'just now';
@@ -318,6 +323,36 @@ function PostErrandForm({ studentId, onCreated, onClose }) {
   );
 }
 
+// ── Tabs ─────────────────────────────────────────────────────────────────
+function TabBar({ tab, setTab, activeCount, completedCount }) {
+  const tabs = [
+    { key: 'active', label: 'Active', count: activeCount },
+    { key: 'completed', label: 'Completed', count: completedCount },
+  ];
+  return (
+    <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+      {tabs.map(t => (
+        <button
+          key={t.key}
+          onClick={() => setTab(t.key)}
+          className={`flex-1 h-9 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${
+            tab === t.key
+              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+          }`}
+        >
+          {t.label}
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+            tab === t.key ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
+          }`}>
+            {t.count}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function ErrandsPage() {
   const supabase = createClient();
@@ -327,6 +362,7 @@ export default function ErrandsPage() {
   const [userId, setUserId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState('');
+  const [tab, setTab] = useState('active');
 
   useEffect(() => { init(); }, []);
 
@@ -341,17 +377,37 @@ export default function ErrandsPage() {
   };
 
   const fetchErrands = async () => {
-    const { data } = await supabase
-      .from('errands')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    const list = data || [];
-
     const { data: { user } } = await supabase.auth.getUser();
+
+    let profileId = null;
     if (user) {
       const { data: profile } = await supabase.from('student_profiles').select('id').eq('user_id', user.id).single();
-      const ownErrands = list.filter(e => e.student_id === profile?.id);
+      profileId = profile?.id ?? null;
+    }
+
+    // Privacy: the "open" marketplace is shared so riders can find errands
+    // to claim, but everything else (pending payment, claimed, completed,
+    // cancelled) is only fetched if it's the current user's own errand
+    // (as the posting student) or one they're the assigned rider on.
+    // This should also be enforced by RLS on the `errands` table server
+    // side — this filter just keeps the client query in step with that.
+    let query = supabase.from('errands').select('*').order('created_at', { ascending: false });
+
+    if (user && profileId) {
+      query = query.or(`status.eq.open,student_id.eq.${profileId},rider_id.eq.${user.id}`);
+    } else if (user) {
+      // Logged in but no student profile yet (e.g. rider-only account) —
+      // open marketplace plus anything already assigned to them as rider.
+      query = query.or(`status.eq.open,rider_id.eq.${user.id}`);
+    } else {
+      query = query.eq('status', 'open');
+    }
+
+    const { data } = await query;
+    const list = data || [];
+
+    if (user) {
+      const ownErrands = list.filter(e => e.student_id === profileId);
 
       // Confirmation codes — RLS on errand_codes only allows the owning
       // student to read these anyway, so this only ever returns rows
@@ -438,6 +494,10 @@ export default function ErrandsPage() {
     return { ok: !!result?.success, message: result?.message || 'Unknown error' };
   };
 
+  const activeErrands = errands.filter(e => ACTIVE_STATUSES.includes(e.status));
+  const completedErrands = errands.filter(e => !ACTIVE_STATUSES.includes(e.status));
+  const visibleErrands = tab === 'active' ? activeErrands : completedErrands;
+
   return (
     <div className="w-full space-y-5 px-4">
       {showForm && studentId && (
@@ -454,6 +514,8 @@ export default function ErrandsPage() {
           <Plus className="w-3.5 h-3.5" /> Post errand
         </button>
       </div>
+
+      <TabBar tab={tab} setTab={setTab} activeCount={activeErrands.length} completedCount={completedErrands.length} />
 
       {toast && (
         <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-500/5 px-3 py-2 flex items-center justify-between">
@@ -474,15 +536,19 @@ export default function ErrandsPage() {
             </div>
           ))}
         </div>
-      ) : errands.length === 0 ? (
+      ) : visibleErrands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
           <span className="text-4xl mb-3">🛵</span>
-          <p className="text-xs font-black text-slate-400">No errands yet</p>
-          <p className="text-[11px] text-slate-300 dark:text-slate-600 mt-1">Post one to get started</p>
+          <p className="text-xs font-black text-slate-400">
+            {tab === 'active' ? 'No active errands' : 'No completed errands yet'}
+          </p>
+          <p className="text-[11px] text-slate-300 dark:text-slate-600 mt-1">
+            {tab === 'active' ? 'Post one to get started' : 'Finished and cancelled errands show up here'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {errands.map(e => (
+          {visibleErrands.map(e => (
             <ErrandCard
               key={e.id}
               errand={e}

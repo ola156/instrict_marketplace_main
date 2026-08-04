@@ -17,12 +17,12 @@
 // paid/rejected), separate from the earnings ledger below, so a single
 // request is never rendered twice.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRunner } from '../../context/RunnerProvider';
 import {
   Wallet, ArrowUpRight, ArrowDownRight, Loader2, RefreshCw, Banknote, Landmark, Save, Clock3,
-  ShieldCheck, CheckCircle2, XCircle, HourglassIcon, AlertCircle,
+  ShieldCheck, CheckCircle2, XCircle, HourglassIcon, AlertCircle, Search,
 } from 'lucide-react';
 
 const cardClass = "rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4";
@@ -48,6 +48,87 @@ const WITHDRAWAL_STATUS = {
   paid: { label: 'Paid', className: 'text-emerald-500 bg-emerald-500/10', icon: CheckCircle2 },
   rejected: { label: 'Rejected', className: 'text-rose-500 bg-rose-500/10', icon: XCircle },
 };
+
+// Searchable bank dropdown — same component used on the vendor wallet, so
+// riders can type to filter a long bank list instead of scrolling a plain
+// <select>. Purely a picker: it reports the chosen {code, name} back via
+// onSelect and doesn't hold bank_code/bank_name itself, so it stays in
+// sync with whatever the parent form considers the source of truth.
+function BankSearchSelect({ banks, banksLoading, selectedName, disabled, onSelect }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = query.trim()
+    ? banks.filter((b) => b.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : banks;
+
+  const pick = (bank) => {
+    onSelect(bank);
+    setQuery('');
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[activeIndex]) pick(filtered[activeIndex]); }
+    else if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
+      <input
+        value={open ? query : (selectedName || '')}
+        onChange={(e) => { setQuery(e.target.value); setActiveIndex(-1); if (!open) setOpen(true); }}
+        onFocus={() => { setQuery(''); setOpen(true); setActiveIndex(-1); }}
+        onKeyDown={handleKeyDown}
+        placeholder={banksLoading ? 'Loading banks…' : 'Search your bank'}
+        disabled={disabled || banksLoading}
+        className={`${inputClass} pl-9 appearance-none`}
+        autoComplete="off"
+      />
+      {open && !banksLoading && (
+        <div className="absolute z-20 mt-1.5 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2.5 text-[11px] font-bold text-slate-400">No banks match "{query}"</p>
+          ) : (
+            filtered.map((b, i) => (
+              <button
+                key={b.code}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(b)}
+                className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${
+                  i === activeIndex
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {b.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RunnerWallet() {
   const supabase = createClient();
@@ -157,10 +238,11 @@ export default function RunnerWallet() {
     return () => { supabase.removeChannel(channel); };
   }, [runner, fetchWallet, supabase]);
 
-  const onBankChange = (e) => {
-    const code = e.target.value;
-    const bank = banks.find((b) => b.code === code);
-    setBankForm((p) => ({ ...p, bank_code: code, bank_name: bank?.name || '', account_name: '' }));
+  // Replaces the old onBankChange(e) handler that read e.target.value off
+  // a plain <select>. BankSearchSelect instead hands back the full
+  // {code, name} bank object it was clicked/selected from.
+  const onBankSelect = (bank) => {
+    setBankForm((p) => ({ ...p, bank_code: bank.code, bank_name: bank.name, account_name: '' }));
     setVerified(false);
     setVerifyError('');
     setBankSaved(false);
@@ -349,17 +431,12 @@ export default function RunnerWallet() {
           <div className="space-y-3">
             <div>
               <label className={labelClass}>Bank</label>
-              <select
-                value={bankForm.bank_code}
-                onChange={onBankChange}
-                disabled={banksLoading}
-                className={`${inputClass} appearance-none`}
-              >
-                <option value="">{banksLoading ? 'Loading banks…' : 'Select your bank'}</option>
-                {banks.map((b) => (
-                  <option key={b.code} value={b.code}>{b.name}</option>
-                ))}
-              </select>
+              <BankSearchSelect
+                banks={banks}
+                banksLoading={banksLoading}
+                selectedName={bankForm.bank_name}
+                onSelect={onBankSelect}
+              />
             </div>
             <div>
               <label className={labelClass}>Account number</label>

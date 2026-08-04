@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import {
   ChevronLeft, Heart, MapPin, ChevronRight,
-  ShoppingBag, Minus, Plus, Check, Star, X, Ban, AlertTriangle,
+  ShoppingBag, Minus, Plus, Check, Star, X, Ban, AlertTriangle, Share2,
 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 
@@ -92,6 +92,7 @@ export default function ProductDescriptionPage() {
   const [qty, setQty] = useState(1);
   const [saved, setSaved] = useState(false);
   const [added, setAdded] = useState(false);
+  const [shared, setShared] = useState(false); // brief "Link copied" feedback for the clipboard fallback
 
   // --- Real cart store integration ---
   const cartItems = useCartStore((state) => state.items);
@@ -175,6 +176,18 @@ export default function ProductDescriptionPage() {
         (!colors.length || v.color === selectedColor)
       )
     : null;
+
+  // Cap on how many can be ordered: the selected variant's stock if this
+  // product has variants, otherwise uncapped (menu_items has no stock
+  // column of its own for non-variant products).
+  const maxQty = hasVariants ? Math.max(selectedVariant?.stock || 0, 1) : Infinity;
+
+  // Whenever the chosen size/color changes, qty could be left pointing at
+  // a number higher than the new variant's actual stock — reset it back
+  // to 1 rather than silently clamping to an unexpected value.
+  useEffect(() => {
+    setQty(1);
+  }, [selectedSize, selectedColor]);
 
   const sizeHasStock = (size) =>
     variants.some(v => v.size === size && v.stock > 0);
@@ -270,10 +283,36 @@ export default function ProductDescriptionPage() {
     setConflictVendorName(null);
   };
 
+  // Native share sheet where supported (mobile browsers, most modern
+  // desktop browsers); falls back to copying the link to the clipboard
+  // with brief inline feedback where navigator.share isn't available.
+  const handleShare = async () => {
+    if (!product) return;
+
+    const shareData = {
+      title: product.name,
+      text: `Check out ${product.name}${vendor ? ` from ${vendor.legal_name}` : ''}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setShared(true);
+        setTimeout(() => setShared(false), 1800);
+      }
+    } catch (err) {
+      // AbortError when the person cancels the native share sheet — not a
+      // real failure, nothing to show for it.
+    }
+  };
+
   if (loading) {
     return (
-      <div className="w-full max-w-5xl mx-auto animate-pulse px-4 pt-4">
-        <div className="grid lg:grid-cols-2 gap-8">
+      <div className="w-full max-w-2xl mx-auto animate-pulse px-4 pt-4">
+        <div className="space-y-6">
           <div className="w-full aspect-[4/3] rounded-3xl bg-slate-200 dark:bg-slate-800" />
           <div className="space-y-3 pt-2">
             <div className="h-8 w-1/2 rounded bg-slate-200 dark:bg-slate-800" />
@@ -303,12 +342,14 @@ export default function ProductDescriptionPage() {
   }
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto pb-24 lg:pb-12 px-4 lg:px-6">
+    <div className="relative w-full max-w-2xl mx-auto pb-24 lg:pb-12 px-4 lg:px-6">
 
-      <div className="grid lg:grid-cols-2 lg:gap-10">
+      {/* Single column, always — image gallery on top, details below,
+          regardless of screen size. */}
+      <div className="space-y-6">
 
         {/* ── Image gallery ──────────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-4 lg:self-start space-y-3">
+        <div className="space-y-3">
           <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
             {images.length > 0
               ? <GalleryImage src={images[activeImage]} alt={product.name} />
@@ -321,6 +362,18 @@ export default function ProductDescriptionPage() {
               className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-md active:scale-95 transition-transform"
             >
               <ChevronLeft className="w-5 h-5 text-slate-900 dark:text-white" />
+            </button>
+
+            <button
+              onClick={handleShare}
+              aria-label="Share this product"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-md active:scale-95 transition-transform"
+            >
+              {shared ? (
+                <Check className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <Share2 className="w-4 h-4 text-slate-900 dark:text-white" />
+              )}
             </button>
 
             {product.is_featured && (
@@ -363,6 +416,10 @@ export default function ProductDescriptionPage() {
             )}
           </div>
 
+          {shared && (
+            <p className="text-center text-[11px] font-bold text-emerald-500">Link copied to clipboard</p>
+          )}
+
           {images.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {images.map((url, i) => (
@@ -390,7 +447,7 @@ export default function ProductDescriptionPage() {
         </div>
 
         {/* ── Details ──────────────────────────────────────────────────────── */}
-        <div className="pt-6 lg:pt-0 divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
 
           {/* Ordering blocked banner — closed store OR suspended student */}
           {orderingBlockedReason && (
@@ -514,9 +571,7 @@ export default function ProductDescriptionPage() {
                   ? 'This combination is not available'
                   : selectedVariant.stock === 0
                     ? 'Out of stock in this option'
-                    : selectedVariant.stock <= 5
-                      ? `Only ${selectedVariant.stock} left`
-                      : 'In stock'}
+                    : `${selectedVariant.stock} in stock`}
               </p>
             </div>
           )}
@@ -560,8 +615,9 @@ export default function ProductDescriptionPage() {
               </button>
               <span className="w-6 text-center text-sm font-black text-slate-900 dark:text-white">{qty}</span>
               <button
-                onClick={() => setQty(q => q + 1)}
-                className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 active:scale-90 transition-transform"
+                onClick={() => setQty(q => Math.min(maxQty, q + 1))}
+                disabled={qty >= maxQty}
+                className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 active:scale-90 transition-transform disabled:opacity-30 disabled:active:scale-100"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -605,8 +661,9 @@ export default function ProductDescriptionPage() {
               </button>
               <span className="w-5 text-center text-sm font-black text-slate-900 dark:text-white">{qty}</span>
               <button
-                onClick={() => setQty(q => q + 1)}
-                className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 active:scale-90 transition-transform"
+                onClick={() => setQty(q => Math.min(maxQty, q + 1))}
+                disabled={qty >= maxQty}
+                className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 active:scale-90 transition-transform disabled:opacity-30 disabled:active:scale-100"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>

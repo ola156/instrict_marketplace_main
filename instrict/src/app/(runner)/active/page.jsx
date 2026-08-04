@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useRunner } from '../context/RunnerProvider';
+import OtpInput from '@/components/otp/OtpInput';
 import {
   MapPin, Phone, Package, CheckCircle2, Loader2, ArrowLeft, ShieldCheck, Clock, Bike,
 } from 'lucide-react';
@@ -148,13 +149,6 @@ export default function RunnerActiveDelivery() {
       return;
     }
     setOrder(prev => ({ ...prev, status: 'picked_up' }));
-  };
-
-  const handleCodeChange = (setter, digits, value, index) => {
-    if (isNaN(Number(value))) return;
-    const next = [...digits];
-    next[index] = value;
-    setter(next);
   };
 
   const confirmDelivery = async () => {
@@ -360,19 +354,12 @@ export default function RunnerActiveDelivery() {
                         </div>
                       </div>
 
-                      <div className="flex justify-center gap-2.5">
-                        {codeDigits.map((digit, index) => (
-                          <input
-                            key={index}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={1}
-                            value={digit}
-                            onChange={(e) => handleCodeChange(setCodeDigits, codeDigits, e.target.value, index)}
-                            className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-lg font-black text-blue-500 outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        ))}
-                      </div>
+                      <OtpInput
+                        length={4}
+                        digits={codeDigits}
+                        onChange={setCodeDigits}
+                        colorClass="text-blue-500 focus:ring-blue-500"
+                      />
 
                       <button
                         onClick={confirmDelivery}
@@ -455,19 +442,12 @@ export default function RunnerActiveDelivery() {
                     </div>
                   </div>
 
-                  <div className="flex justify-center gap-2.5">
-                    {errandCodeDigits.map((digit, index) => (
-                      <input
-                        key={index}
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleCodeChange(setErrandCodeDigits, errandCodeDigits, e.target.value, index)}
-                        className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-lg font-black text-purple-500 outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    ))}
-                  </div>
+                  <OtpInput
+                    length={4}
+                    digits={errandCodeDigits}
+                    onChange={setErrandCodeDigits}
+                    colorClass="text-purple-500 focus:ring-purple-500"
+                  />
 
                   <button
                     onClick={confirmErrand}

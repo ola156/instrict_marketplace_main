@@ -37,6 +37,26 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
   const supabase = createClient();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Set only when a community notification is clicked (VendorNotifications
+  // -> onNavigate). Handed down to CommunityFeed as highlightPostId so it
+  // can scroll to and ring-highlight that specific post.
+  const [highlightPostId, setHighlightPostId] = useState(null);
+
+  // VendorNotifications has no URL to router.push to — this dashboard is a
+  // local activeSection toggle, not a route. So instead of navigating, it
+  // calls this with { section, postId? } and we flip the same state the
+  // bottom nav / bell icon already use.
+  //
+  // NOTE: this dashboard has no 'orders' or 'kitchen' section — work here
+  // is quote/project based. new_order/status_changed notifications are
+  // mapped to 'projects' as the closest analog below. Flag if that's wrong
+  // for how variable-service vendors actually work — might belong on
+  // 'quotes' instead depending on when these notification types fire.
+  const handleNotificationNavigate = (section, params) => {
+    if (params?.postId) setHighlightPostId(params.postId);
+    onSectionChange(section);
+  };
+
   useEffect(() => {
     fetchUnread();
     const channel = supabase
@@ -80,8 +100,8 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
       case 'portfolio':     return <Portfolio vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'calendar':      return <AvailabilityCalendar vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'wallet':        return <VendorWallet vendor={vendor} isSuspended={isSuspended} />;
-      case 'notifications': return <VendorNotifications vendor={vendor} />;
-      case 'community':     return <CommunityFeed authorType="vendor" isSuspended={isSuspended} />;
+      case 'notifications': return <VendorNotifications vendor={vendor} onNavigate={handleNotificationNavigate} sectionMap={{ order: 'projects', payment: 'wallet' }} />;
+      case 'community':     return <CommunityFeed authorType="vendor" isSuspended={isSuspended} highlightPostId={highlightPostId} />;
       case 'settings':      return <VendorSettings vendor={vendor} onUpdate={onVendorUpdate} />;
       case 'help':          return <HelpDesk authorType="vendor" vendor={vendor} />;
       default:

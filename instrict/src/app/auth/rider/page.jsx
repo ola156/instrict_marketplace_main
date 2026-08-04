@@ -5,7 +5,7 @@ import { useCampusStore } from '@/store/useCampusStore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ShieldCheck, Mail, Lock, User, ArrowRight, KeyRound, Bike } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, ArrowRight, KeyRound, Bike } from 'lucide-react';
 import { getCampusFullName } from '@/constants/universities';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -54,6 +54,11 @@ export default function RiderAuth() {
   const [serverError, setServerError] = useState('');
 
   const currentCampusLabel = getCampusFullName(campus);
+
+
+    const handleBack = () => {
+    router.back();
+  };
 
   const { register, handleSubmit, setValue, clearErrors, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(riderAuthSchema),
@@ -199,13 +204,26 @@ export default function RiderAuth() {
       <section className="flex-1 flex justify-center items-center p-6 sm:p-8 md:p-12 bg-white dark:bg-slate-950 transition-colors duration-500 overflow-y-auto ">
         <div className="w-full max-w-sm space-y-6">
           
+ {/* BACK BUTTON */}
+          <button
+            onClick={handleBack}
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors -ml-1"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+
+
+
           <div className="space-y-1">
-            <h2 className="text-xl font-black tracking-tight">
+            <h2 className="text-md font-black tracking-tight">
               {authMode === 'login' && 'Runner Log In'}
               {authMode === 'signup' && 'Register as Runner'}
               {authMode === 'forgot' && 'Reset Runner Password'}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs text-slate-400">
               {authMode === 'forgot' 
                 ? 'Enter your runner identity parameters to coordinate a reset link'
                 : `Connecting runner:  `
@@ -342,25 +360,25 @@ export default function RiderAuth() {
                 {authMode === 'login' && (
                   <button
                     onClick={() => handleModeSwitch('signup')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs hover:text-slate-500 text-blue-600 dark:text-blue-400 transition-colors font-semibold"
                   >
-                    Want to run errands for profit? Activate a courier account
+                    New here? Activate a courier account
                   </button>
                 )}
                 {authMode === 'signup' && (
                   <button
                     onClick={() => handleModeSwitch('login')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs hover:text-slate-500 text-blue-600 dark:text-blue-400 transition-colors font-semibold"
                   >
-                    Already have a registered fleet profile? Log In
+                    Already registered? Log In
                   </button>
                 )}
                 {authMode === 'forgot' && (
                   <button
                     onClick={() => handleModeSwitch('login')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs hover:text-slate-500 text-blue-600 dark:text-blue-400 transition-colors font-semibold"
                   >
-                    Return to fleet initialization screen
+                    Return to runner login screen
                   </button>
                 )}
               </div>

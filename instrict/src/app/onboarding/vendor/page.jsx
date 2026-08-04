@@ -2,13 +2,13 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  ShoppingBag, 
-  UtensilsCrossed, 
-  Wrench, 
-  ArrowRight, 
-  ArrowLeft, 
-  CheckCircle2, 
+import {
+  ShoppingBag,
+  UtensilsCrossed,
+  Wrench,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
   MessageSquare,
   Building2,
   Phone,
@@ -19,6 +19,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import OtpInput from '@/components/otp/OtpInput';
 
 const FIXED_SERVICE_SUBCATEGORIES = new Set([
   'Printing & Photocopying',
@@ -61,7 +62,6 @@ export default function VendorOnboarding() {
   const [verificationPhone, setVerificationPhone] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const otpRefs = useRef([]);
 
   // Holds the SendChamp verification_reference between send and confirm steps
   const verificationReferenceRef = useRef(null);
@@ -150,7 +150,7 @@ export default function VendorOnboarding() {
 
   const subCategoryDirectory = {
     retail: [
-      'Gadgets & Tech Accessories', 'Phones & Laptops', 'Thrift & Fashion Clothes', 
+      'Gadgets & Tech Accessories', 'Phones & Laptops', 'Thrift & Fashion Clothes',
       'Footwear & Sneakers', 'Groceries & Provisions', 'Stationery & Textbooks',
       'Cosmetics & Skincare', 'Beddings & Room Decor', 'Perfumes & Oils'
     ],
@@ -160,7 +160,7 @@ export default function VendorOnboarding() {
       'Breakfast Hubs', 'Soft Drinks & Mocktails'
     ],
     service: [
-      'Academic Tutor', 'Printing & Photocopying', 'Graphic Designer', 
+      'Academic Tutor', 'Printing & Photocopying', 'Graphic Designer',
       'UI/UX & Web Developer', 'Laundry & Dry Cleaning', 'Logistics & Campus Errands',
       'Hairstylist & Barbering', 'Gadget Repair & Software Flashing', 'Photography & Videography'
     ]
@@ -169,9 +169,9 @@ export default function VendorOnboarding() {
   const recommendedOptions = useMemo(() => {
     if (!profileData.category) return [];
     const pool = subCategoryDirectory[profileData.category] || [];
-    
-    const filtered = pool.filter(item => 
-      item.toLowerCase().includes(subCategorySearch.toLowerCase()) && 
+
+    const filtered = pool.filter(item =>
+      item.toLowerCase().includes(subCategorySearch.toLowerCase()) &&
       !profileData.subCategories.includes(item)
     );
 
@@ -330,23 +330,6 @@ export default function VendorOnboarding() {
     }
   };
 
-  const handleOtpChange = (value, index) => {
-    if (isNaN(Number(value))) return;
-    const newDigits = [...otpDigits];
-    newDigits[index] = value;
-    setOtpDigits(newDigits);
-
-    if (value !== '' && index < 5) {
-      otpRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace' && otpDigits[index] === '' && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
   // ── FINAL: verify OTP via SendChamp, then mark phone_verified in Supabase ──
   const handleFinalVerification = async (e) => {
     e.preventDefault();
@@ -417,7 +400,7 @@ export default function VendorOnboarding() {
 
   return (
     <main className="h-screen w-full flex flex-col md:flex-row overflow-hidden bg-white dark:bg-slate-950 text-slate-950 dark:text-white antialiased">
-      
+
       <section className="hidden md:flex flex-[0.5] lg:flex-[0.6] p-12 flex-col justify-between text-white bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.15),transparent_50%)]" />
         <div className="relative z-10 text-xl font-black tracking-tighter">
@@ -454,7 +437,7 @@ export default function VendorOnboarding() {
 
       <section className="flex-1 flex justify-center p-6 sm:p-10 md:p-12 lg:p-14 bg-white dark:bg-slate-950 overflow-y-auto relative">
         <div className="w-full max-w-2xl space-y-6 my-auto">
-          
+
           <div className="flex items-center justify-between md:hidden border-b border-slate-100 dark:border-slate-900 pb-4">
             <span className="text-xs font-black tracking-tighter uppercase">Instrict Marketplace</span>
             <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-400">
@@ -632,8 +615,8 @@ export default function VendorOnboarding() {
                         type="button"
                         onClick={() => selectCategory(cat.id)}
                         className={`w-full p-3 rounded-xl border text-left flex gap-4 transition-all duration-200 group relative overflow-hidden ${
-                          isSelected 
-                            ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20' 
+                          isSelected
+                            ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20'
                             : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-900'
                         }`}
                       >
@@ -662,8 +645,8 @@ export default function VendorOnboarding() {
                   {profileData.subCategories.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-900">
                       {profileData.subCategories.map((item) => (
-                        <span 
-                          key={item} 
+                        <span
+                          key={item}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500 text-white font-bold text-[10px] tracking-tight shadow-sm"
                         >
                           {item}
@@ -802,20 +785,12 @@ export default function VendorOnboarding() {
                     </p>
                   </div>
 
-                  <div className="flex justify-between gap-2 max-w-sm mx-auto">
-                    {otpDigits.map((digit, index) => (
-                      <input
-                        key={index}
-                        type="text"
-                        maxLength={1}
-                        value={digit}
-                        ref={(el) => (otpRefs.current[index] = el)}
-                        onChange={(e) => handleOtpChange(e.target.value, index)}
-                        onKeyDown={(e) => handleOtpKeyDown(e, index)}
-                        className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-lg font-black text-blue-500 outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ))}
-                  </div>
+                  <OtpInput
+                    length={6}
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    colorClass="text-blue-500 focus:ring-blue-500"
+                  />
 
                   <button
                     type="submit"

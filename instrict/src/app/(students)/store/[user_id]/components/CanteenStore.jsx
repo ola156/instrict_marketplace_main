@@ -233,23 +233,26 @@ export default function CanteenStore({ vendor, canOrder, orderingBlockedReason }
         </div>
       </div>
 
-      {/* ============ CATEGORY FILTERS ============ */}
-      <div className="w-full bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800/60 py-3.5 px-4 sticky top-0 z-20">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-2xl lg:max-w-5xl mx-auto">
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setActiveCategory(c)}
-              className={cn(
-                'shrink-0 text-[11px] lg:text-xs font-bold px-4 py-2 lg:px-5 lg:py-2.5 rounded-full border whitespace-nowrap transition-all duration-200',
-                activeCategory === c
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-              )}
-            >
-              {c}
-            </button>
-          ))}
+      {/* ============ CATEGORY TABS ============ */}
+      <div className="w-full bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20">
+        <div className="flex gap-6 overflow-x-auto no-scrollbar max-w-2xl lg:max-w-5xl mx-auto px-4">
+          {categories.map((c) => {
+            const isActive = activeCategory === c;
+            return (
+              <button
+                key={c}
+                onClick={() => setActiveCategory(c)}
+                className={cn(
+                  'relative shrink-0 text-[12px] lg:text-sm font-bold whitespace-nowrap py-3.5 transition-colors duration-200 border-b-2',
+                  isActive
+                    ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                    : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'
+                )}
+              >
+                {c}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -267,10 +270,10 @@ export default function CanteenStore({ vendor, canOrder, orderingBlockedReason }
 )}
 
 
-      {/* ============ MENU ITEMS ============ */}
-      <div className="flex-1 w-full max-w-2xl lg:max-w-5xl mx-auto px-4 py-2 lg:py-6">
+      {/* ============ MENU ITEMS — single stacked column at every screen size ============ */}
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 py-2 lg:py-6">
         {loading ? (
-          <div className="flex flex-col lg:grid lg:grid-cols-3 lg:gap-x-8">
+          <div className="flex flex-col">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex gap-3.5 py-4 animate-pulse">
                 <div className="h-16 w-16 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
@@ -293,7 +296,7 @@ export default function CanteenStore({ vendor, canOrder, orderingBlockedReason }
             <p className="text-xs font-black text-slate-900 dark:text-white">No items in this category</p>
           </div>
         ) : (
-          <div className="flex flex-col lg:grid lg:grid-cols-3 lg:gap-x-8">
+          <div className="flex flex-col">
             {filteredMenuItems.map((item) => {
               const itemCount = getItemQuantity(item.id);
               return (

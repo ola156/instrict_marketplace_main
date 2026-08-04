@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Plus, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Trash2, Tag, Sparkles } from 'lucide-react';
 import ImageUpload, { ImagePlaceholder } from '../shared/ImageUpload';
@@ -196,13 +196,20 @@ function MenuItemCard({ item, extras, onUpdate, onDelete, isSuspended }) {
               <ImagePlaceholder name={item.name} size="sm" />
             )}
 
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-xs font-black text-slate-900 dark:text-white truncate min-w-0">
-                {item.name}
-              </h3>
-              {!item.is_available && (
-                <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
-                  Hidden
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-xs font-black text-slate-900 dark:text-white truncate min-w-0">
+                  {item.name}
+                </h3>
+                {!item.is_available && (
+                  <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
+                    Hidden
+                  </span>
+                )}
+              </div>
+              {item.category && (
+                <span className="inline-block text-[9px] font-bold text-blue-500 dark:text-blue-400 mt-0.5">
+                  {item.category}
                 </span>
               )}
             </div>
@@ -282,7 +289,7 @@ export default function MenuManager({ vendorUserId, isSuspended }) {
   const [extras, setExtras] = useState({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', base_price: '', image_url: '' });
+  const [form, setForm] = useState({ name: '', description: '', base_price: '', image_url: '', category: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { fetchMenu(); }, []);
@@ -312,6 +319,15 @@ export default function MenuManager({ vendorUserId, isSuspended }) {
     setLoading(false);
   };
 
+  // Categories already used by this vendor's other dishes — offered as
+  // quick-pick suggestions so category names stay consistent (e.g. always
+  // "Drinks", never a mix of "Drinks"/"drinks"/"Drink") instead of vendors
+  // free-typing slightly different spellings each time.
+  const existingCategories = useMemo(
+    () => [...new Set(items.map(i => i.category).filter(Boolean))],
+    [items]
+  );
+
   const addItem = async () => {
     if (isSuspended || !form.name || !form.base_price) return;
     setSaving(true);
@@ -321,8 +337,9 @@ export default function MenuManager({ vendorUserId, isSuspended }) {
       description: form.description,
       base_price: Number(form.base_price),
       image_url: form.image_url || null,
+      category: form.category.trim() || null,
     });
-    setForm({ name: '', description: '', base_price: '', image_url: '' });
+    setForm({ name: '', description: '', base_price: '', image_url: '', category: '' });
     setShowForm(false);
     await fetchMenu();
     setSaving(false);
@@ -394,6 +411,39 @@ export default function MenuManager({ vendorUserId, isSuspended }) {
               type="number"
               className="h-10 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 transition-colors"
             />
+            <div className="sm:col-span-2 space-y-1.5">
+              <input
+                value={form.category}
+                onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                placeholder="Category — e.g. Drinks, Mains, Sides (optional)"
+                list="menu-category-suggestions"
+                className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500 transition-colors"
+              />
+              {/* Native datalist gives free-typing with autocomplete against
+                  categories this vendor has already used — no extra UI
+                  component needed, works the same on mobile and desktop. */}
+              <datalist id="menu-category-suggestions">
+                {existingCategories.map(c => <option key={c} value={c} />)}
+              </datalist>
+              {existingCategories.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {existingCategories.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, category: c }))}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-colors ${
+                        form.category === c
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-300'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               value={form.description}
               onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
@@ -408,7 +458,7 @@ export default function MenuManager({ vendorUserId, isSuspended }) {
 
           <div className="flex flex-col-reverse sm:flex-row gap-2">
             <button
-              onClick={() => { setShowForm(false); setForm({ name: '', description: '', base_price: '', image_url: '' }); }}
+              onClick={() => { setShowForm(false); setForm({ name: '', description: '', base_price: '', image_url: '', category: '' }); }}
               className="h-9 px-4 border border-slate-200 dark:border-slate-700 text-slate-500 text-xs font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
             >
               Cancel

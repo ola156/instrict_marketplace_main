@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
+import ImageCropModal from './ImageCropModal';
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -38,22 +39,15 @@ function ImagePlaceholder({ name = '', size = 'md' }) {
 
 export { ImagePlaceholder };
 
-export default function ImageUpload({ value, onChange, label = 'Photo', optional = true, size = 'lg' }) {
+// aspect: width / height for the crop stage. 1 = square (avatars), 16/9-ish
+// for banners — pass e.g. aspect={2.5} for the wide banner in VendorSettings.
+export default function ImageUpload({ value, onChange, label = 'Photo', optional = true, size = 'lg', aspect = 1 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [pendingFile, setPendingFile] = useState(null); // file waiting to be cropped
   const inputRef = useRef();
 
-  const handleFile = async (file) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5MB');
-      return;
-    }
-
+  const uploadFile = async (file) => {
     setError('');
     setUploading(true);
 
@@ -82,10 +76,35 @@ export default function ImageUpload({ value, onChange, label = 'Photo', optional
     }
   };
 
+  const handleFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB');
+      return;
+    }
+    setError('');
+    // Don't upload yet — let the user crop/resize first
+    setPendingFile(file);
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
+  };
+
+  const handleCropConfirm = (croppedFile) => {
+    setPendingFile(null);
+    uploadFile(croppedFile);
+  };
+
+  const handleCropCancel = () => {
+    setPendingFile(null);
+    if (inputRef.current) inputRef.current.value = '';
   };
 
   return (
@@ -163,6 +182,15 @@ export default function ImageUpload({ value, onChange, label = 'Photo', optional
         className="hidden"
         onChange={e => handleFile(e.target.files[0])}
       />
+
+      {pendingFile && (
+        <ImageCropModal
+          file={pendingFile}
+          aspect={aspect}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </div>
   );
 }

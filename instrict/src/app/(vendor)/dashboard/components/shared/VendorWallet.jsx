@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
-  Wallet, TrendingUp, Clock, ArrowDownLeft, Building2, CreditCard,
+  Wallet, TrendingUp, Clock, ArrowDownLeft, Search, CreditCard,
   User, Save, CheckCircle2, AlertCircle, Ban, ShieldCheck, Loader2,
 } from 'lucide-react';
 
@@ -69,6 +69,87 @@ function TransactionRow({ order }) {
           ₦{gross.toLocaleString()} − {PLATFORM_COMMISSION_PERCENT}% fee
         </p>
       </div>
+    </div>
+  );
+}
+
+// Searchable bank dropdown — replaces a plain <select> so vendors/riders
+// can type to filter a long bank list instead of scrolling through it.
+// Purely a picker: it reports the chosen {code, name} back via onSelect
+// and doesn't hold bank_code/bank_name itself, so it stays in sync with
+// whatever the parent form considers the source of truth.
+function BankSearchSelect({ banks, banksLoading, selectedName, disabled, onSelect }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = query.trim()
+    ? banks.filter((b) => b.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : banks;
+
+  const pick = (bank) => {
+    onSelect(bank);
+    setQuery('');
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[activeIndex]) pick(filtered[activeIndex]); }
+    else if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
+      <input
+        value={open ? query : (selectedName || '')}
+        onChange={(e) => { setQuery(e.target.value); setActiveIndex(-1); if (!open) setOpen(true); }}
+        onFocus={() => { setQuery(''); setOpen(true); setActiveIndex(-1); }}
+        onKeyDown={handleKeyDown}
+        placeholder={banksLoading ? 'Loading banks…' : 'Search your bank'}
+        disabled={disabled || banksLoading}
+        className={`${inputClass} pl-9`}
+        autoComplete="off"
+      />
+      {open && !banksLoading && (
+        <div className="absolute z-20 mt-1.5 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2.5 text-[11px] font-bold text-slate-400">No banks match "{query}"</p>
+          ) : (
+            filtered.map((b, i) => (
+              <button
+                key={b.code}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(b)}
+                className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${
+                  i === activeIndex
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {b.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -166,10 +247,8 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
     setLoading(false);
   };
 
-  const onBankChange = (e) => {
-    const code = e.target.value;
-    const bank = banks.find((b) => b.code === code);
-    setBankForm((p) => ({ ...p, bank_code: code, bank_name: bank?.name || '', account_name: '' }));
+  const onBankSelect = (bank) => {
+    setBankForm((p) => ({ ...p, bank_code: bank.code, bank_name: bank.name, account_name: '' }));
     setVerified(false);
     setVerifyError('');
   };
@@ -376,20 +455,13 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
             <div className="p-5 space-y-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Bank</label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
-                  <select
-                    value={bankForm.bank_code}
-                    onChange={onBankChange}
-                    disabled={isSuspended || banksLoading}
-                    className={`${inputClass} pl-9 appearance-none`}
-                  >
-                    <option value="">{banksLoading ? 'Loading banks…' : 'Select your bank'}</option>
-                    {banks.map((b) => (
-                      <option key={b.code} value={b.code}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <BankSearchSelect
+                  banks={banks}
+                  banksLoading={banksLoading}
+                  selectedName={bankForm.bank_name}
+                  disabled={isSuspended}
+                  onSelect={onBankSelect}
+                />
               </div>
 
               <div className="space-y-1.5">

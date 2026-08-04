@@ -5,7 +5,7 @@ import { useCampusStore } from '@/store/useCampusStore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ShieldCheck, Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, KeyRound, ArrowLeft } from 'lucide-react';
 import { getCampusFullName } from '@/constants/universities';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -70,6 +70,10 @@ export default function StudentAuth() {
     setServerError('');
     setValue('mode', newMode);
     setAuthMode(newMode);
+  };
+
+  const handleBack = () => {
+    router.back();
   };
 
   const handleAuthSubmit = async (data) => {
@@ -200,7 +204,17 @@ export default function StudentAuth() {
       {/* REGISTRATION, LOGIN, & PASSWORD RESET COMPONENT SHEET */}
       <section className="flex-1 flex justify-center items-center p-6 sm:p-8 md:p-12 bg-white dark:bg-slate-950 transition-colors duration-500 overflow-y-auto ">
         <div className="w-full max-w-sm space-y-4">
-          
+
+          {/* BACK BUTTON */}
+          <button
+            onClick={handleBack}
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors -ml-1"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
           <div className="space-y-2">
             <h2 className="text-2xl font-black tracking-tight">
               {authMode === 'login' && 'Welcome back'}
@@ -344,23 +358,23 @@ export default function StudentAuth() {
                 {authMode === 'login' && (
                   <button
                     onClick={() => handleModeSwitch('signup')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs font-semibold hover:text-slate-800 text-blue-600 dark:text-blue-400 transition-colors "
                   >
-                    New to this perimeter? Initialize an account
+                    New User? Create an account
                   </button>
                 )}
                 {authMode === 'signup' && (
                   <button
                     onClick={() => handleModeSwitch('login')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs hover:text-slate-800 text-blue-600 dark:text-blue-400 transition-colors font-semibold"
                   >
-                    Already authenticated in this node? Log In
+                    Already have an account? Log In
                   </button>
                 )}
                 {authMode === 'forgot' && (
                   <button
                     onClick={() => handleModeSwitch('login')}
-                    className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+                    className="text-xs hover:text-slate-800 text-blue-600 dark:text-blue-400 transition-colors font-medium"
                   >
                     Return to Log In window
                   </button>

@@ -1,5 +1,11 @@
 import CommunityFeed from '@/components/feed/CommunityFeed';
 
-export default function RunnerCommunityPage() {
-  return <CommunityFeed authorType="rider" />;
+import { Suspense } from 'react';
+
+export default function CommunityPage() {
+  return (
+    <Suspense fallback={null}>
+      <CommunityFeed authorType="rider" />
+    </Suspense>
+  );
 }

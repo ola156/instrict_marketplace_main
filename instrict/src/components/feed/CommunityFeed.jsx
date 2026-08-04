@@ -15,8 +15,14 @@
 // viewer's own authorType (student/vendor/rider), not the author of any
 // given post — a suspended vendor viewing the feed can't post, comment,
 // or like, regardless of who wrote what they're looking at.
+//
+// Likes: stored as jsonb [{id, type}, ...] rather than a bare uuid[] so
+// the "liked by" modal can resolve each liker's name without guessing
+// which profile table they belong to. toggle_post_like(post_id, liker_type)
+// needs the viewer's own authorType passed in for the same reason.
 
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import VerificationGate from '@/components/verification/VerificationGate';
 import { Heart, MessageCircle, Image as ImageIcon, Send, X, Loader2, Trash2, Store, Bike, GraduationCap, Ban } from 'lucide-react';
@@ -63,6 +69,70 @@ function SuspendedBanner() {
   );
 }
 
+function LikesModal({ likes, onClose }) {
+  const supabase = createClient();
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const enriched = await Promise.all(
+        (likes || []).map(async (l) => ({
+          id: l.id,
+          type: l.type,
+          name: await fetchAuthorName(supabase, l.id, l.type),
+        }))
+      );
+      setEntries(enriched);
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 w-full sm:w-80 sm:rounded-2xl rounded-t-2xl max-h-[70vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900">
+          <p className="text-xs font-black text-slate-900 dark:text-white">Liked by</p>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 text-slate-400 animate-spin" /></div>
+        ) : (
+          <div className="p-2">
+            {entries.map(e => {
+              const config = AUTHOR_PROFILE[e.type] || AUTHOR_PROFILE.student;
+              const RoleIcon = config.icon;
+              return (
+                <div key={e.id} className="flex items-center gap-2.5 px-2 py-2">
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${config.badgeClass} flex items-center justify-center shrink-0`}>
+                    <span className="text-white text-[11px] font-black">{e.name?.[0]?.toUpperCase() || 'U'}</span>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black text-slate-900 dark:text-white">{e.name}</p>
+                    {e.type !== 'student' && (
+                      <span className="flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        <RoleIcon className="w-2.5 h-2.5" /> {config.fallback}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {entries.length === 0 && (
+              <p className="text-[11px] text-slate-400 text-center py-4">No likes yet</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
   const supabase = createClient();
   const [showComments, setShowComments] = useState(false);
@@ -70,8 +140,9 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
   const [commentText, setCommentText] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showLikes, setShowLikes] = useState(false);
 
-  const liked = post.likes?.includes(currentUserId);
+  const liked = post.likes?.some(l => l.id === currentUserId);
   const likeCount = post.likes?.length || 0;
   const displayedCommentCount = showComments ? comments.length : (post.comment_count || 0);
   const config = AUTHOR_PROFILE[post.author_type] || AUTHOR_PROFILE.student;
@@ -202,8 +273,15 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
           className={`flex items-center gap-1.5 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${liked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}
         >
           <Heart className={`w-4 h-4 ${liked ? 'fill-rose-500' : ''}`} />
-          {likeCount > 0 && likeCount}
         </button>
+        {likeCount > 0 && (
+          <button
+            onClick={() => setShowLikes(true)}
+            className="text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors -ml-3"
+          >
+            {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+          </button>
+        )}
         <button
           onClick={toggleComments}
           className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-blue-500 transition-colors"
@@ -212,6 +290,8 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
           {displayedCommentCount > 0 && displayedCommentCount}
         </button>
       </div>
+
+      {showLikes && <LikesModal likes={post.likes} onClose={() => setShowLikes(false)} />}
 
       {/* Comments */}
       {showComments && (
@@ -353,12 +433,24 @@ function CreatePost({ currentUserId, authorType, onCreated, suspended }) {
   );
 }
 
-export default function CommunityFeed({ authorType = 'student' }) {
+export default function CommunityFeed({ authorType = 'student', highlightPostId: highlightPostIdProp }) {
   const supabase = createClient();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [suspended, setSuspended] = useState(false);
+
+  // Deep-linked from a notification click, e.g. /community?highlight=<post_id>.
+  // Read once on mount — if the user navigates within the feed afterward
+  // we don't want an old highlight param re-triggering the scroll.
+  const searchParams = useSearchParams();
+  const [highlightId, setHighlightId] = useState(null);
+  const highlightedOnceRef = useRef(false);
+
+  useEffect(() => {
+    const id = highlightPostIdProp || searchParams.get('highlight');
+    if (id) setHighlightId(id);
+  }, [highlightPostIdProp, searchParams]);
 
   useEffect(() => { init(); }, [authorType]);
 
@@ -409,6 +501,20 @@ export default function CommunityFeed({ authorType = 'student' }) {
     setPosts(enriched);
     setLoading(false);
   };
+
+  // Once the highlighted post has actually loaded into `posts`, scroll to
+  // it and clear the highlight after a few seconds. Guarded by a ref so a
+  // realtime update to `posts` later doesn't re-trigger the scroll.
+  useEffect(() => {
+    if (!highlightId || highlightedOnceRef.current) return;
+    const match = posts.find(p => p.id === highlightId);
+    if (!match) return;
+    highlightedOnceRef.current = true;
+    const el = document.getElementById(`post-${highlightId}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = setTimeout(() => setHighlightId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [posts, highlightId]);
 
   // Realtime: everyone with the feed open sees new posts, likes, and
   // deletes as they happen, not just the person who took the action.
@@ -469,7 +575,10 @@ export default function CommunityFeed({ authorType = 'student' }) {
 
   const handleLike = async (postId) => {
     if (suspended) return;
-    const { data, error } = await supabase.rpc('toggle_post_like', { post_id: postId });
+    // liker_type is required so toggle_post_like can store {id, type} —
+    // without it the "liked by" modal wouldn't know which profile table
+    // to resolve this liker's name from.
+    const { data, error } = await supabase.rpc('toggle_post_like', { post_id: postId, liker_type: authorType });
     if (error) {
       console.error('toggle like error:', error);
       return;
@@ -515,7 +624,13 @@ export default function CommunityFeed({ authorType = 'student' }) {
       ) : (
         <div className="space-y-4">
           {posts.map(post => (
-            <PostCard key={post.id} post={post} currentUserId={currentUserId} onDelete={handleDelete} onLike={handleLike} suspended={suspended} />
+            <div
+              key={post.id}
+              id={`post-${post.id}`}
+              className={highlightId === post.id ? 'ring-2 ring-blue-500 rounded-2xl transition-all' : 'transition-all'}
+            >
+              <PostCard post={post} currentUserId={currentUserId} onDelete={handleDelete} onLike={handleLike} suspended={suspended} />
+            </div>
           ))}
         </div>
       )}

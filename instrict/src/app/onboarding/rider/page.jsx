@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useCampusStore } from '@/store/useCampusStore';
 import { getCampusFullName } from '@/constants/universities';
+import OtpInput from '@/components/otp/OtpInput';
 import {
   Bike, User, Phone, FileText,
   ArrowRight, ArrowLeft, CheckCircle2, MessageSquare
@@ -17,11 +18,6 @@ const VEHICLE_TYPES = [
   'Motorcycle',
   'Tricycle (Keke)',
 ];
-
-// TODO(remove-before-launch): dev-only bypass for OTP during testing.
-// Delete handleSkipVerification and the button that calls it once
-// SendChamp OTP is fully wired and tested end to end.
-const SKIP_VERIFICATION_ENABLED = true;
 
 export default function RiderOnboarding() {
   const router = useRouter();
@@ -46,7 +42,6 @@ export default function RiderOnboarding() {
   // OTP
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const otpRefs = useRef([]);
 
   // Holds the SendChamp verification_reference between send and confirm steps
   const verificationReferenceRef = useRef(null);
@@ -204,20 +199,6 @@ export default function RiderOnboarding() {
     }
   };
 
-  const handleOtpChange = (value, index) => {
-    if (isNaN(Number(value))) return;
-    const newDigits = [...otpDigits];
-    newDigits[index] = value;
-    setOtpDigits(newDigits);
-    if (value !== '' && index < 5) otpRefs.current[index + 1]?.focus();
-  };
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace' && otpDigits[index] === '' && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
   // Shared finalization — same DB writes whether the rider actually
   // verified via SendChamp or used the dev skip button. `approved`
   // is never touched here; it stays whatever it already is (default false).
@@ -277,21 +258,6 @@ export default function RiderOnboarding() {
     } catch (err) {
       console.error('OTP verify error:', err);
       setServerError('Verification failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // DEV ONLY — bypasses SendChamp entirely, runs the same finalization
-  // writes as a real verification would. Remove this along with the
-  // SKIP_VERIFICATION_ENABLED flag before launch.
-  const handleSkipVerification = async () => {
-    setServerError('');
-    setIsLoading(true);
-    try {
-      await finalizeOnboarding();
-    } catch (err) {
-      setServerError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -528,8 +494,6 @@ export default function RiderOnboarding() {
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back
                 </button>
-
-               
               </div>
 
               <div>
@@ -594,20 +558,12 @@ export default function RiderOnboarding() {
                     </p>
                   </div>
 
-                  <div className="flex justify-between gap-2 max-w-xs mx-auto">
-                    {otpDigits.map((digit, index) => (
-                      <input
-                        key={index}
-                        type="text"
-                        maxLength={1}
-                        value={digit}
-                        ref={el => (otpRefs.current[index] = el)}
-                        onChange={e => handleOtpChange(e.target.value, index)}
-                        onKeyDown={e => handleOtpKeyDown(e, index)}
-                        className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-lg font-black text-blue-500 outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ))}
-                  </div>
+                  <OtpInput
+                    length={6}
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    colorClass="text-blue-500 focus:ring-blue-500"
+                  />
 
                   <button
                     type="submit"

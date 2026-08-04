@@ -7,13 +7,14 @@ import VerificationDocUpload from './VerificationDocUpload';
 
 const TABLE = { vendor: 'vendor_verifications', rider: 'rider_verifications' };
 const ID_COLUMN = { vendor: 'vendor_id', rider: 'rider_id' };
+const MOTORIZED_VEHICLE_TYPES = ['Motorcycle', 'Tricycle (Keke)'];
 
 export default function VerificationForm({ role, profile }) {
   const supabase = createClient();
   const userId = profile.user_id;
   const table = TABLE[role];
   const idColumn = ID_COLUMN[role];
-  const needsLicense = role === 'rider' && profile.has_vehicle;
+const needsLicense = role === 'rider' && MOTORIZED_VEHICLE_TYPES.includes(profile.vehicle_type);
 
   const [existing, setExisting] = useState(null);
   const [loading, setLoading] = useState(true);

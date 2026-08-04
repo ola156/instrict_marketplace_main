@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, Mail, Lock, ArrowRight, KeyRound } from 'lucide-react';
+import { Store, Mail, Lock, ArrowRight, KeyRound, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useCampusStore } from '@/store/useCampusStore';
 import { getCampusFullName } from '@/constants/universities';
@@ -36,6 +36,11 @@ export default function VendorAuthForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+    const handleBack = () => {
+    router.back();
+  };
+
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -86,6 +91,8 @@ export default function VendorAuthForm() {
         setIsLoading(false);
         return;
       }
+
+
 
      if (authMode === 'login') {
   const { data, error: loginError } = await supabase.auth.signInWithPassword({
@@ -187,6 +194,19 @@ export default function VendorAuthForm() {
       {/* ── FORM PANEL ── */}
       <section className="flex-1 flex justify-center p-6 sm:p-8 md:p-12 bg-white dark:bg-slate-950 overflow-y-auto py-10 relative">
         <div className="w-full max-w-sm space-y-4 my-auto relative">
+
+ {/* BACK BUTTON */}
+          <button
+            onClick={handleBack}
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors -ml-1"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+
+
 
           <div className="pt-2 md:pt-0">
             <h2 className="text-md font-black tracking-tight mt-2">
@@ -336,7 +356,7 @@ export default function VendorAuthForm() {
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className="text-xs text-slate-400 hover:text-blue-500 transition-colors font-medium"
+                className="text-xs hover:text-slate-500 text-blue-500 transition-colors font-semibold"
               >
                 New vendor? Register your brand
               </button>
@@ -345,7 +365,7 @@ export default function VendorAuthForm() {
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-xs text-slate-400 hover:text-blue-500 transition-colors font-medium"
+                className="text-xs hover:text-slate-500 text-blue-500 transition-colors font-semibold"
               >
                 Already have a storefront? Log In
               </button>
@@ -354,7 +374,7 @@ export default function VendorAuthForm() {
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-xs text-slate-400 hover:text-blue-500 transition-colors font-medium"
+                className="text-xs hover:text-slate-500 text-blue-500 transition-colors font-semibold"
               >
                 Return to login
               </button>

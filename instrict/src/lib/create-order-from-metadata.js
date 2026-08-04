@@ -49,10 +49,11 @@ export async function createOrderFromMetadata(supabase, reference, metadata) {
     throw orderError;
   }
 
-  if (metadata.order_type !== 'print' && Array.isArray(metadata.items)) {
+ if (metadata.order_type !== 'print' && Array.isArray(metadata.items)) {
     const orderItems = metadata.items.map((i) => ({
       order_id: order.id,
       menu_item_id: uuidOrNull(i.id?.split('::')[1]),
+      variant_id: uuidOrNull(i.meta?.variantId),
       name: i.name,
       unit_price: i.unitPrice,
       quantity: i.quantity,
@@ -60,6 +61,38 @@ export async function createOrderFromMetadata(supabase, reference, metadata) {
     }));
     const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
     if (itemsError) console.error('order_items insert error:', itemsError);
+
+    // Decrement stock for every line that has a real variant. Canteen items
+    // (no variantId) have no stock column to touch — skipped by design.
+    for (const i of metadata.items) {
+      const variantId = i.meta?.variantId;
+      if (!variantId) continue;
+
+      const { data: stockResult, error: stockError } = await supabase.rpc(
+        'decrement_variant_stock',
+        { p_variant_id: variantId, p_qty: i.quantity }
+      );
+
+      if (stockError) {
+        console.error('[stock] decrement failed:', { variantId, qty: i.quantity, error: stockError });
+        continue;
+      }
+
+      const updated = stockResult?.[0]?.updated_stock;
+      if (updated !== undefined && updated < 0) {
+        console.error('[stock] OVERSOLD:', {
+          variantId,
+          itemName: i.name,
+          orderId: order.id,
+          deficit: Math.abs(updated),
+        });
+        // Fire-and-forget admin alert so oversells get eyes on them fast.
+        notifyAdminsOfActivity(supabase, {
+          title: 'Oversold item',
+          body: `${i.name} went ${Math.abs(updated)} below stock on order ${order.id}.`,
+        }).catch((err) => console.error('[push] oversell alert error:', err));
+      }
+    }
   }
 
   // Fire notifications only once, for a genuinely new order — the 23505

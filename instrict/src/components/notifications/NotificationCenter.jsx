@@ -1,18 +1,47 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Bell, ShoppingBag, CheckCircle2, RefreshCw, BellOff, Trash2 } from 'lucide-react';
+import { Bell, ShoppingBag, CheckCircle2, RefreshCw, BellOff, Trash2, MessageCircle, Heart } from 'lucide-react';
 
 const typeConfig = {
   new_order:         { icon: ShoppingBag,   color: 'bg-blue-500/10 text-blue-500',    dot: 'bg-blue-500' },
   payment_confirmed: { icon: CheckCircle2,  color: 'bg-emerald-500/10 text-emerald-500', dot: 'bg-emerald-500' },
   status_changed:    { icon: RefreshCw,     color: 'bg-purple-500/10 text-purple-500', dot: 'bg-purple-500' },
   errand_accepted:   { icon: Bell,          color: 'bg-amber-500/10 text-amber-500',   dot: 'bg-amber-500' },
+  community_tag:     { icon: MessageCircle, color: 'bg-pink-500/10 text-pink-500',     dot: 'bg-pink-500' },
+  community_comment: { icon: MessageCircle, color: 'bg-pink-500/10 text-pink-500',     dot: 'bg-pink-500' },
+  community_like:    { icon: Heart,         color: 'bg-rose-500/10 text-rose-500',     dot: 'bg-rose-500' },
 };
 
-export default function NotificationCenter() {
+// Route shape differs per portal (student vs rider currently share this
+// component). Add an entry here rather than hardcoding paths inline —
+// vendor doesn't belong in this map at all since it has no routes (see
+// VendorNotifications.js, which resolves to a section instead of a URL).
+const PORTAL_ROUTES = {
+  student: {
+    order: (id) => `/orders/${id}`,
+    community: (id) => `/community?highlight=${id}`,
+  },
+  rider: {
+    order:`/jobs`,
+    community: (id) => `/runner/community?highlight=${id}`,
+  },
+};
+
+// Where a tap should land, based on what the notification is actually about.
+// order_id wins if present (order-related types); related_post_id otherwise.
+function resolveDestination(n, portal) {
+  const routes = PORTAL_ROUTES[portal] || PORTAL_ROUTES.student;
+  if (n.order_id) return routes.order(n.order_id);
+  if (n.related_post_id) return routes.community(n.related_post_id);
+  return null;
+}
+
+export default function NotificationCenter({ onNavigate, portal = 'student' } = {}) {
   const supabase = createClient();
+  const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,6 +79,15 @@ export default function NotificationCenter() {
   const markRead = async (id) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  };
+
+  const handleClick = (n) => {
+    if (!n.is_read) markRead(n.id);
+    const dest = resolveDestination(n, portal);
+    if (dest) {
+      onNavigate?.();
+      router.push(dest);
+    }
   };
 
   const deleteOne = async (id) => {
@@ -106,11 +144,12 @@ export default function NotificationCenter() {
           {notifications.map(n => {
             const cfg = typeConfig[n.type] || typeConfig.new_order;
             const Icon = cfg.icon;
+            const clickable = !!resolveDestination(n, portal);
             return (
               <div
                 key={n.id}
-                onClick={() => !n.is_read && markRead(n.id)}
-                className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group ${!n.is_read ? 'bg-blue-500/[0.02]' : ''}`}
+                onClick={() => handleClick(n)}
+                className={`flex items-start gap-3 p-3 rounded-xl ${clickable ? 'cursor-pointer' : 'cursor-default'} hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group ${!n.is_read ? 'bg-blue-500/[0.02]' : ''}`}
               >
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.color}`}>
                   <Icon className="w-4 h-4" />

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/useCartStore';
 import { Minus, Plus, Trash2, ShoppingBag, Store, X } from 'lucide-react';
 
-export default function CheckoutBasket({ isMobile = false }) {
+export default function CheckoutBasket({ isMobile = false, onClose }) {
   const router = useRouter();
   const { items, vendorName, updateQuantity, removeItem, clearCart } = useCartStore();
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -17,6 +17,7 @@ export default function CheckoutBasket({ isMobile = false }) {
     // Cart lives in the Zustand store (persisted), so /checkout can read
     // items/vendorId/vendorName straight from useCartStore — no need to
     // pass anything through the URL or props.
+      onClose?.()
     router.push('/checkout');
   };
 

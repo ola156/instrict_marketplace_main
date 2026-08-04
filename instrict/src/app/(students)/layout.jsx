@@ -13,12 +13,14 @@ import {
   Home, ShoppingBag, User, Bell, LogOut,
   MessageSquare, ShoppingCart, X, Bike, ArrowRight,
   MessageCircle,
+
+  Rss,
 } from 'lucide-react';
 import Image from 'next/image';
 
 const navTabs = [
   { name: 'Home',      href: '/home',      icon: Home },
-  { name: 'Community', href: '/community', icon: MessageSquare },
+  { name: 'Community', href: '/community', icon: Rss },
   { name: 'Orders',    href: '/orders',    icon: ShoppingBag },
   { name: 'Errands',   href: '/errands',   icon: Bike },
   { name: 'Profile',   href: '/profile',   icon: User },
@@ -136,9 +138,9 @@ export default function StudentLayout({ children }) {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 p-4 overflow-hidden">
-              <CheckoutBasket isMobile={true} />
-            </div>
+           <div className="flex-1 p-4 overflow-hidden">
+  <CheckoutBasket isMobile={true} onClose={() => setMobileCartOpen(false)} />
+</div>
           </div>
         </div>
       )}
@@ -250,12 +252,12 @@ export default function StudentLayout({ children }) {
         </aside>
 
         {/* CENTER — Main content */}
-        <main className="flex-1 min-w-0 lg:px-0 py-3 lg:py-8 pb-24 lg:pb-8 overflow-y-auto h-screen scrollbar-none">
-          {showNotifications
-            ? <NotificationCenter />
-            : children
-          }
-        </main>
+      <main className="flex-1 min-w-0 lg:px-0 py-3 lg:py-8 pb-24 lg:pb-8 overflow-y-auto h-screen scrollbar-none">
+  {showNotifications
+    ? <NotificationCenter onNavigate={() => setShowNotifications(false)} />
+    : children
+  }
+</main>
 
         {/* RIGHT — Basket shelf (desktop only) */}
         <aside className="hidden xl:flex w-72 flex-col py-8 h-screen sticky top-0 shrink-0 pl-6 border-l border-slate-100 dark:border-slate-900">

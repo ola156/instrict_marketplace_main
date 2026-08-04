@@ -9,6 +9,8 @@ import {
   RefreshCw,
   BellOff,
   Trash2,
+  MessageCircle,
+  Heart,
 } from 'lucide-react';
 
 const typeConfig = {
@@ -27,11 +29,45 @@ const typeConfig = {
     color: 'bg-purple-500/10 text-purple-500',
     dot: 'bg-purple-500',
   },
+  community_tag: {
+    icon: MessageCircle,
+    color: 'bg-pink-500/10 text-pink-500',
+    dot: 'bg-pink-500',
+  },
+  community_comment: {
+    icon: MessageCircle,
+    color: 'bg-pink-500/10 text-pink-500',
+    dot: 'bg-pink-500',
+  },
+  community_like: {
+    icon: Heart,
+    color: 'bg-rose-500/10 text-rose-500',
+    dot: 'bg-rose-500',
+  },
 };
 
-function NotificationRow({ notification, onRead, onDelete }) {
+// Vendor dashboard has no per-section routes — everything lives inside
+// /dashboard behind an activeSection/onSectionChange state toggle. So
+// instead of a URL, this resolves to { section, postId? } and the parent
+// CanteenDashboard is responsible for calling onSectionChange and, for
+// community posts, stashing postId so it can hand it to CommunityFeed as
+// a highlightPostId prop.
+//
+// Routing is deliberately type-specific rather than order_id-generic:
+// payment_confirmed is about money (Wallet), new_order/status_changed are
+// about fulfilling the order (Kitchen). Adjust here if that's wrong for
+// your flow — this is the only place that mapping lives.
+function resolveDestination(n) {
+  if (n.related_post_id) return { section: 'community', postId: n.related_post_id };
+  if (n.type === 'payment_confirmed') return { section: 'wallet' };
+  if (n.order_id) return { section: 'kitchen' };
+  return null;
+}
+
+function NotificationRow({ notification, onClick, onDelete }) {
   const cfg = typeConfig[notification.type] || typeConfig.new_order;
   const Icon = cfg.icon;
+  const clickable = !!resolveDestination(notification);
 
   return (
     <div
@@ -45,7 +81,10 @@ function NotificationRow({ notification, onRead, onDelete }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0" onClick={() => !notification.is_read && onRead(notification.id)}>
+      <div
+        className={`flex-1 min-w-0 ${clickable ? 'cursor-pointer' : ''}`}
+        onClick={() => onClick(notification)}
+      >
         <div className="flex items-start justify-between gap-2">
           <p className={`text-xs leading-snug ${
             notification.is_read
@@ -78,7 +117,7 @@ function NotificationRow({ notification, onRead, onDelete }) {
   );
 }
 
-export default function VendorNotifications({ vendor }) {
+export default function VendorNotifications({ vendor, onNavigate }) {
   const supabase = createClient();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +157,12 @@ export default function VendorNotifications({ vendor }) {
   const markRead = async (id) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  };
+
+  const handleClick = (notification) => {
+    if (!notification.is_read) markRead(notification.id);
+    const dest = resolveDestination(notification);
+    if (dest) onNavigate?.(dest.section, { postId: dest.postId });
   };
 
   const markAllRead = async () => {
@@ -231,7 +276,7 @@ export default function VendorNotifications({ vendor }) {
               <NotificationRow
                 key={notification.id}
                 notification={notification}
-                onRead={markRead}
+                onClick={handleClick}
                 onDelete={deleteNotification}
               />
             ))}

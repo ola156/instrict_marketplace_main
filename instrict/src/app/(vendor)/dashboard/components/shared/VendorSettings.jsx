@@ -189,17 +189,19 @@ export default function VendorSettings({ vendor, onUpdate }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ImageUpload
-                value={form.avatar_url}
-                onChange={url => set('avatar_url', url)}
-                label="Profile Photo"
-                optional={true}
-              />
-              <ImageUpload
-                value={form.banner_url}
-                onChange={url => set('banner_url', url)}
-                label="Banner Image"
-                optional={true}
-              />
+  value={form.avatar_url}
+  onChange={url => set('avatar_url', url)}
+  label="Profile Photo"
+  optional={true}
+  aspect={2.5}
+/>
+             <ImageUpload
+  value={form.banner_url}
+  onChange={url => set('banner_url', url)}
+  label="Banner Image"
+  optional={true}
+  aspect={2.5}
+/>
             </div>
           </Section>
 

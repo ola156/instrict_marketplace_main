@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useCampusStore } from '@/store/useCampusStore';
 import { getCampusFullName } from '@/constants/universities';
+import OtpInput from '@/components/otp/OtpInput';
 import {
   User, Hash, Phone, MapPin,
   ArrowRight, ArrowLeft, CheckCircle2, MessageSquare
@@ -43,7 +44,6 @@ export default function UserOnboarding() {
 
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const otpRefs = useRef([]);
 
   // Holds the SendChamp verification_reference between send and confirm steps
   const verificationReferenceRef = useRef(null);
@@ -205,20 +205,6 @@ export default function UserOnboarding() {
       setServerError('Failed to send code. Please try again.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleOtpChange = (value, index) => {
-    if (isNaN(Number(value))) return;
-    const newDigits = [...otpDigits];
-    newDigits[index] = value;
-    setOtpDigits(newDigits);
-    if (value !== '' && index < 5) otpRefs.current[index + 1]?.focus();
-  };
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace' && otpDigits[index] === '' && index > 0) {
-      otpRefs.current[index - 1]?.focus();
     }
   };
 
@@ -626,20 +612,12 @@ export default function UserOnboarding() {
                     </p>
                   </div>
 
-                  <div className="flex justify-between gap-2 max-w-xs mx-auto">
-                    {otpDigits.map((digit, index) => (
-                      <input
-                        key={index}
-                        type="text"
-                        maxLength={1}
-                        value={digit}
-                        ref={el => (otpRefs.current[index] = el)}
-                        onChange={e => handleOtpChange(e.target.value, index)}
-                        onKeyDown={e => handleOtpKeyDown(e, index)}
-                        className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-lg font-black text-blue-500 outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ))}
-                  </div>
+                  <OtpInput
+                    length={6}
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    colorClass="text-blue-500 focus:ring-blue-500"
+                  />
 
                   <button
                     type="submit"
@@ -661,8 +639,6 @@ export default function UserOnboarding() {
                     >
                       Didn't get code? Resend
                     </button>
-
-                    
                   </div>
                 </form>
               )}

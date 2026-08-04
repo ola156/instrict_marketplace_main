@@ -35,6 +35,22 @@ export default function CanteenDashboard({ vendor, activeSection, onSectionChang
   const supabase = createClient();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Set only when a community notification is clicked (VendorNotifications
+  // -> onNavigate). Handed down to CommunityFeed as highlightPostId so it
+  // can scroll to and ring-highlight that specific post. Not cleared on
+  // every section change — it just sits unused until the vendor opens
+  // Community again via a notification.
+  const [highlightPostId, setHighlightPostId] = useState(null);
+
+  // VendorNotifications has no URL to router.push to — everything here is
+  // a local activeSection toggle, not a route. So instead of navigating,
+  // it calls this with { section, postId? } and we flip the same state
+  // the bottom nav / bell icon already use.
+  const handleNotificationNavigate = (section, params) => {
+    if (params?.postId) setHighlightPostId(params.postId);
+    onSectionChange(section);
+  };
+
   useEffect(() => {
     fetchUnread();
 
@@ -82,9 +98,9 @@ export default function CanteenDashboard({ vendor, activeSection, onSectionChang
       case 'wallet':
         return <VendorWallet vendor={vendor} isSuspended={isSuspended} />;
       case 'notifications':
-        return <VendorNotifications vendor={vendor} />;
+        return <VendorNotifications vendor={vendor} onNavigate={handleNotificationNavigate} />;
       case 'community':
-        return <CommunityFeed authorType="vendor" isSuspended={isSuspended} />;
+        return <CommunityFeed authorType="vendor" isSuspended={isSuspended} highlightPostId={highlightPostId} />;
       case 'settings':
         return <VendorSettings vendor={vendor} onUpdate={onVendorUpdate} />;
       case 'help':
