@@ -23,7 +23,10 @@ export default function ImageCropModal({ file, aspect = 1, onConfirm, onCancel }
   const dragRef = useRef(null); // { mode: 'move'|'resize', handle?, startX, startY, origBox }
 
   // Load file, read natural size, compute display size (contain-fit) and
-  // an initial crop box centered at the largest size that fits the aspect.
+  // an initial crop box at the LARGEST size that fits the aspect within
+  // the image — i.e. the whole image is usable from the start. The person
+  // shrinks it themselves if they want a tighter crop, instead of starting
+  // small and having to drag it bigger first.
   useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -36,19 +39,14 @@ export default function ImageCropModal({ file, aspect = 1, onConfirm, onCancel }
       setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
       setDisplaySize({ w: dW, h: dH });
 
-      // Start the box smaller than the max possible size so there's room
-      // to drag corners outward (expand) as well as inward (shrink).
-      let maxBoxW, maxBoxH;
+      let boxW, boxH;
       if (dW / dH > aspect) {
-        maxBoxH = dH;
-        maxBoxW = dH * aspect;
+        boxH = dH;
+        boxW = dH * aspect;
       } else {
-        maxBoxW = dW;
-        maxBoxH = dW / aspect;
+        boxW = dW;
+        boxH = dW / aspect;
       }
-      const START_FRACTION = 0.7;
-      const boxW = maxBoxW * START_FRACTION;
-      const boxH = maxBoxH * START_FRACTION;
       setBox({ x: (dW - boxW) / 2, y: (dH - boxH) / 2, w: boxW, h: boxH });
     };
     img.src = url;
@@ -152,18 +150,16 @@ export default function ImageCropModal({ file, aspect = 1, onConfirm, onCancel }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">
-            Crop photo
-          </p>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <p className="text-xs font-black text-slate-900 dark:text-white">Crop photo</p>
           <button onClick={onCancel} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="px-4 pb-4 space-y-4">
           <div
             ref={stageRef}
             className="relative mx-auto select-none touch-none"
@@ -188,41 +184,30 @@ export default function ImageCropModal({ file, aspect = 1, onConfirm, onCancel }
                   top: box.y,
                   width: box.w,
                   height: box.h,
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)',
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
                   border: '1.5px solid white',
                 }}
                 onMouseDown={startMove}
                 onTouchStart={startMove}
               >
-                {/* rule-of-thirds guide lines */}
-                <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
-                  {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="border border-white/30" />
-                  ))}
-                </div>
-
                 {HANDLES.map((h) => (
                   <div
                     key={h}
                     onMouseDown={startResize(h)}
                     onTouchStart={startResize(h)}
-                    className="absolute w-4 h-4 bg-white rounded-full border-2 border-blue-600 shadow"
+                    className="absolute w-3.5 h-3.5 bg-white rounded-full shadow"
                     style={{
                       cursor: CURSOR_OF[h],
-                      left: h.includes('l') ? -8 : undefined,
-                      right: h.includes('r') ? -8 : undefined,
-                      top: h.includes('t') ? -8 : undefined,
-                      bottom: h.includes('b') ? -8 : undefined,
+                      left: h.includes('l') ? -7 : undefined,
+                      right: h.includes('r') ? -7 : undefined,
+                      top: h.includes('t') ? -7 : undefined,
+                      bottom: h.includes('b') ? -7 : undefined,
                     }}
                   />
                 ))}
               </div>
             )}
           </div>
-
-          <p className="text-[10px] text-slate-400 text-center">
-            Drag the box to reposition, drag a corner to resize
-          </p>
 
           <div className="flex gap-2">
             <button

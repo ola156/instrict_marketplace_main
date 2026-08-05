@@ -201,12 +201,17 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
   const submitComment = async () => {
     if (suspended || !commentText.trim() || submitting) return;
     setSubmitting(true);
-    const { data, error } = await supabase.from('community_comments').insert({
-      post_id: post.id,
-      author_id: currentUserId,
-      author_type: post.viewerAuthorType,
-      content: commentText.trim(),
-    }).select().single();
+
+    const res = await fetch('/api/community/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postId: post.id,
+        content: commentText.trim(),
+        authorType: post.viewerAuthorType,
+      }),
+    });
+    const { comment: data, error } = await res.json();
 
     if (error) {
       console.error('submitComment error:', error);
@@ -577,8 +582,14 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
     if (suspended) return;
     // liker_type is required so toggle_post_like can store {id, type} —
     // without it the "liked by" modal wouldn't know which profile table
-    // to resolve this liker's name from.
-    const { data, error } = await supabase.rpc('toggle_post_like', { post_id: postId, liker_type: authorType });
+    // to resolve this liker's name from. Routed through the API (rather
+    // than calling the RPC directly) so a new like can trigger a push.
+    const res = await fetch('/api/community/likes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId, likerType: authorType }),
+    });
+    const { likes: data, error } = await res.json();
     if (error) {
       console.error('toggle like error:', error);
       return;

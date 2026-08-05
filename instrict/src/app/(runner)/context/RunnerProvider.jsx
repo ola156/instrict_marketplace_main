@@ -60,8 +60,8 @@ export function RunnerProvider({ children }) {
       .channel(`runner-unread-badge-${runner.user_id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `vendor_id=eq.${runner.user_id}` },
-        () => setUnreadCount((c) => c + 1)
+       { event: '*', schema: 'public', table: 'notifications', filter: `vendor_id=eq.${runner.user_id}` },
+() => fetchUnreadCount()
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };

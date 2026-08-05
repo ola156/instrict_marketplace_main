@@ -11,10 +11,8 @@ import HelpDesk from '@/components/HelpDesk';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   Home, ShoppingBag, User, Bell, LogOut,
-  MessageSquare, ShoppingCart, X, Bike, ArrowRight,
+  Rss, ShoppingCart, X, Bike, ArrowRight,
   MessageCircle,
-
-  Rss,
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -38,20 +36,34 @@ export default function StudentLayout({ children }) {
   const [showHelpDesk, setShowHelpDesk] = useState(false);
   const [profile, setProfile] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Nothing in this layout renders until this flips true — otherwise the
+  // full sidebar/nav/children render immediately while fetchProfile is
+  // still checking auth, and only redirect after the fact. That's a
+  // visible flash of the authenticated shell for anyone not logged in,
+  // even if only for a moment.
+  const [authChecked, setAuthChecked] = useState(false);
 
-  usePushNotifications(profile?.id, { table: 'student_profiles', idColumn: 'id' });
+  // IMPORTANT: keyed on user_id (auth uid), not profile.id — the
+  // notifications table stores the recipient id as the auth uid, so the
+  // push token has to live under that same key or the sender will never
+  // find it. This used to pass profile?.id with idColumn 'id', which saved
+  // the token under student_profiles' own primary key instead — a
+  // different value from user_id, so tokens were silently unfindable by
+  // anything looking up a recipient by auth id.
+  usePushNotifications(profile?.user_id, { table: 'student_profiles', idColumn: 'user_id' });
 
   useEffect(() => { fetchProfile(); fetchUnread(); }, []);
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/auth/student'); return; }
+    if (!user) { router.push('/auth/student'); return; } // authChecked stays false — layout never renders
     const { data } = await supabase
       .from('student_profiles')
-      .select('id, full_name, avatar_url')
+      .select('id, user_id, full_name, avatar_url')
       .eq('user_id', user.id)
       .single();
     setProfile(data);
+    setAuthChecked(true);
   };
 
   const fetchUnread = async () => {
@@ -71,6 +83,14 @@ export default function StudentLayout({ children }) {
   };
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Student';
+
+  if (!authChecked) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 antialiased flex flex-col overflow-x-hidden">
@@ -109,7 +129,7 @@ export default function StudentLayout({ children }) {
             onClick={() => setShowNotifications(false)}
             className={`p-2 rounded-xl transition-colors ${pathname === '/community' ? 'bg-blue-500/10 text-blue-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
           >
-            <MessageSquare className="w-5 h-5" />
+            <Rss className="w-5 h-5" />
           </Link>
 
           {/* Notifications */}
@@ -252,12 +272,12 @@ export default function StudentLayout({ children }) {
         </aside>
 
         {/* CENTER — Main content */}
-      <main className="flex-1 min-w-0 lg:px-0 py-3 lg:py-8 pb-24 lg:pb-8 overflow-y-auto h-screen scrollbar-none">
-  {showNotifications
-    ? <NotificationCenter onNavigate={() => setShowNotifications(false)} />
-    : children
-  }
-</main>
+        <main className="flex-1 min-w-0 lg:px-0 py-3 lg:py-8 pb-24 lg:pb-8 overflow-y-auto h-screen scrollbar-none">
+          {showNotifications
+            ? <NotificationCenter onNavigate={() => setShowNotifications(false)} portal="student" />
+            : children
+          }
+        </main>
 
         {/* RIGHT — Basket shelf (desktop only) */}
         <aside className="hidden xl:flex w-72 flex-col py-8 h-screen sticky top-0 shrink-0 pl-6 border-l border-slate-100 dark:border-slate-900">

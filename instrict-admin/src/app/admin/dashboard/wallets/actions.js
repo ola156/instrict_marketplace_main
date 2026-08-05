@@ -85,6 +85,17 @@ export async function markVendorWithdrawalPaid(requestId) {
     .eq('id', requestId);
   if (error) return { error: error.message };
 
+  // Ledger row for the vendor's own transaction history — mirrors
+  // markRiderWithdrawalPaid below. Recorded after the DB status update
+  // succeeds so this row only exists for withdrawals that are actually
+  // confirmed paid.
+  await supabase.from('vendor_wallet_transactions').insert({
+    vendor_id: request.vendor_id,
+    amount: -Number(request.amount),
+    type: 'withdrawal',
+    description: 'Payout processed by admin',
+  });
+
   revalidatePath(WALLETS_PATH);
   return { success: true };
 }
@@ -114,6 +125,15 @@ export async function rejectVendorWithdrawal(requestId, reason) {
     .update({ status: 'rejected', processed_at: new Date().toISOString(), rejection_reason: reason.trim() })
     .eq('id', requestId);
   if (error) return { error: error.message };
+
+  // Ledger row so the vendor sees the reversal in their own transaction
+  // history, mirroring rejectRiderWithdrawal below.
+  await supabase.from('vendor_wallet_transactions').insert({
+    vendor_id: request.vendor_id,
+    amount: Number(request.amount),
+    type: 'adjustment',
+    description: `Withdrawal rejected — returned to balance: ${reason.trim()}`,
+  });
 
   revalidatePath(WALLETS_PATH);
   return { success: true };

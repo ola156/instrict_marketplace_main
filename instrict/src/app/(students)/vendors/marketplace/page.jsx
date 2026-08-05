@@ -146,40 +146,41 @@ const fetchProducts = async () => {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {list.map(p => (
-            <Link
-              key={p.id}
-              href={`/vendors/marketplace/product/${p.id}`}
-              className="flex flex-col rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-sm transition-all"
-            >
-              {/* Image container — fixed height, image contained inside it */}
-              <div className="relative w-full h-48 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                {p.is_featured && (
-                  <span className="absolute top-2 left-2 bg-slate-900 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md z-10">
-                    Featured
-                  </span>
-                )}
-                {p.image_url ? (
-                  <img
-                    src={p.image_url}
-                    alt={p.name}
-                    className="w-full h-full"
-                    style={{ objectFit: 'cover' }}
-                  />
-                ) : (
-                  <ShoppingBag className="w-8 h-8 text-slate-300" />
-                )}
-              </div>
+ <Link
+      href={`/vendors/marketplace/product/${p.id}`}
+      className="flex flex-col h-full rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+    >
+      {/* Image container — fixed height, image covers it */}
+      <div className="relative w-full h-40 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+        {p.image_url ? (
+          <img
+            src={p.image_url}
+            alt={p.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <ShoppingBag className="w-8 h-8 text-slate-300" />
+        )}
+      </div>
 
-              {/* Text container — separate, fixed padding, sits below */}
-              <div className="h-16 p-2.5 space-y-1">
-                <p className="text-xs font-bold leading-tight line-clamp-2 text-slate-900 dark:text-white">
-                  {p.name}
-                </p>
-                <p className="text-sm font-black text-slate-900 dark:text-white">
-                  ₦{Number(p.base_price).toLocaleString()}
-                </p>
-              </div>
-            </Link>
+      {/* Text container — flex-1 so it fills remaining space, pushing
+          price/category to the same spot regardless of name length */}
+      <div className="flex flex-col flex-1 p-2.5">
+        <p className="text-xs font-bold leading-tight line-clamp-2 min-h-[2.2em] text-slate-900 dark:text-white">
+          {p.name}
+        </p>
+        <div className="mt-auto pt-1.5 space-y-1">
+          <p className="text-sm font-black text-slate-900 dark:text-white">
+            ₦{Number(p.base_price).toLocaleString()}
+          </p>
+          {p.category && (
+            <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              {p.category}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
           ))}
         </div>
       )}

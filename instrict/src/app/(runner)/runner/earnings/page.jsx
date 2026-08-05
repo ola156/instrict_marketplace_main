@@ -401,7 +401,7 @@ export default function RunnerWallet() {
             </div>
           </div>
           <p className="text-[9px] font-bold text-blue-100/70 mt-3 pt-3 border-t border-white/10">
-  Earnings shown already reflect the platform fee — 5% on deliveries, 3% on errands.
+  Earnings shown already reflect the platform fee — 3% on errands and deliveries.
 </p>
         </div>
 

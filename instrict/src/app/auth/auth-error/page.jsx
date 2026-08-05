@@ -12,11 +12,11 @@ export default function AuthErrorPage() {
   // Determine where to send them back based on their portal role
   const getLoginPath = () => {
     switch (role) {
-      case 'vendor': return '/vendor/auth';
-      case 'rider': return '/rider/auth';
+      case 'vendor': return '/auth/vendor';
+      case 'rider': return '/auth/rider';
       case 'user':
       default:
-        return '/auth'; // Adjust to your specific student auth route if different
+        return '/auth/student'; // Adjust to your specific student auth route if different
     }
   };
 

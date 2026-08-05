@@ -7,7 +7,6 @@ import StoreStatusBanner from '../shared/StoreStatusBanner';
 import FixedServiceOverview from './FixedServiceOverview';
 import IncomingOrders from './IncomingOrders';
 import PriceMatrix from './PriceMatrix';
-import Portfolio from './Portfolio';
 import VendorSettings from '../shared/VendorSettings';
 import VendorWallet from '../shared/VendorWallet';
 import VendorNotifications from '../shared/VendorNotifications';
@@ -19,7 +18,6 @@ const sectionTitle = {
   overview:      'Dashboard',
   orders:        'Incoming Orders',
   pricing:       'Price Matrix',
-  portfolio:     'Portfolio Showcase',
   wallet:        'Wallet',
   notifications: 'Notifications',
   community:     'Community',

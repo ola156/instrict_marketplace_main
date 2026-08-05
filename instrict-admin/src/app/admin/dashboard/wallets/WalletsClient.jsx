@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Wallet, TrendingUp, Truck, Store, Check, X, Clock, AlertTriangle, Bike, ShoppingBag, Layers } from 'lucide-react';
+import { Wallet, TrendingUp, Truck, Store, Check, X, Clock, AlertTriangle, Bike, ShoppingBag, Layers, Percent } from 'lucide-react';
 import {
   markVendorWithdrawalPaid,
   rejectVendorWithdrawal,
@@ -28,6 +28,14 @@ function StatCard({ label, value, sub, icon: Icon, tone }) {
       <p className="text-lg font-mono font-bold text-slate-100">{value}</p>
       {sub && <p className="text-[10px] text-slate-500 mt-0.5">{sub}</p>}
     </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-4 pt-4 pb-1">
+      {children}
+    </p>
   );
 }
 
@@ -163,52 +171,99 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
 
   return (
     <div className="space-y-4">
-      {/* Vendor-side revenue (order commission) + overall balances owed */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 pb-0">
-        <StatCard label="Vendor commission" value={`₦${revenue.service_charge.toLocaleString()}`} sub="Service charges on paid orders" icon={TrendingUp} tone="emerald" />
-        <StatCard label="Gross order volume" value={`₦${revenue.total.toLocaleString()}`} sub="All paid orders" icon={Wallet} tone="blue" />
-        <StatCard label="Owed to vendors" value={`₦${totalOwedVendors.toLocaleString()}`} sub="Unpaid balances" icon={Store} tone="amber" />
-        <StatCard label="Owed to riders" value={`₦${totalOwedRiders.toLocaleString()}`} sub="Unpaid balances" icon={Truck} tone="amber" />
-      </div>
-
-      {/* Rider-side platform fee — split by source so orders and errands
-          are each visible on their own, plus a combined total across
-          both. Pulled from rider_wallet_transactions.platform_fee, set
-          by credit_rider_on_delivery (5%) and
-          credit_rider_on_errand_completion (3%). */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 pt-0">
+      {/* SECTION 1 — money students pay on top of their bill (service
+          charges), added to what they're charged, kept in full by the
+          platform. Not deducted from anyone else's earnings. */}
+      <SectionLabel>Fees Charged To Students</SectionLabel>
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 px-4">
         <StatCard
-          label="Order delivery fees"
-          value={`₦${revenue.rider_fee_orders.toLocaleString()}`}
-          sub="5% platform fee on rider deliveries"
-          icon={ShoppingBag}
-          tone="blue"
+          label="Order Service Fee"
+          value={`₦${revenue.service_charge.toLocaleString()}`}
+          sub="3% added to student's order total at checkout"
+          icon={Percent}
+          tone="emerald"
         />
         <StatCard
-          label="Errand fees"
-          value={`₦${revenue.rider_fee_errands.toLocaleString()}`}
-          sub="3% platform fee on completed errands"
-          icon={Bike}
-          tone="purple"
-        />
-        <StatCard
-          label="Errand gross volume"
-          value={`₦${revenue.errand_volume.toLocaleString()}`}
-          sub="All completed errand rewards"
-          icon={Wallet}
-          tone="slate"
-        />
-        <StatCard
-          label="Total platform revenue"
-          value={`₦${revenue.platform_total.toLocaleString()}`}
-          sub="Vendor commission + rider fees"
-          icon={Layers}
+          label="Errand Service Fee"
+          value={`₦${revenue.errand_service_charge.toLocaleString()}`}
+          sub="3% added when a student posts an errand"
+          icon={Percent}
           tone="emerald"
         />
       </div>
 
+      {/* SECTION 2 — commission the platform deducts FROM what vendors
+          and riders earn, not charged to students. Now exact and
+          per-transaction via vendor_wallet_transactions /
+          rider_wallet_transactions, not a recalculated estimate. */}
+      <SectionLabel>Commission Deducted From Vendors & Riders</SectionLabel>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 px-4">
+        <StatCard
+          label="Vendor Commission"
+          value={`₦${revenue.vendor_fee_orders.toLocaleString()}`}
+          sub="3% deducted from every vendor's order subtotal"
+          icon={Store}
+          tone="blue"
+        />
+        <StatCard
+          label="Rider Commission — Deliveries"
+          value={`₦${revenue.rider_fee_orders.toLocaleString()}`}
+          sub="3% deducted from rider's delivery fee"
+          icon={ShoppingBag}
+          tone="blue"
+        />
+        <StatCard
+          label="Rider Commission — Errands"
+          value={`₦${revenue.rider_fee_errands.toLocaleString()}`}
+          sub="3% deducted from rider's errand reward"
+          icon={Bike}
+          tone="purple"
+        />
+      </div>
+
+      {/* SECTION 3 — operational totals: volume, what's owed out, and the
+          combined revenue figure across all four fee streams above. */}
+     <SectionLabel>Volume & Totals</SectionLabel>
+<div className="grid grid-cols-2 lg:grid-cols-5 gap-3 px-4 pb-4">
+  <StatCard
+    label="Total Money In"
+    value={`₦${revenue.total_income.toLocaleString()}`}
+    sub="All cash received — orders + errands, before any payout"
+    icon={Wallet}
+    tone="blue"
+  />
+  <StatCard
+    label="Errand Gross Volume"
+    value={`₦${revenue.errand_volume.toLocaleString()}`}
+    sub="Total rewards across completed errands"
+    icon={Wallet}
+    tone="slate"
+  />
+  <StatCard
+    label="Owed To Vendors"
+    value={`₦${totalOwedVendors.toLocaleString()}`}
+    sub="Unpaid wallet balances"
+    icon={Store}
+    tone="amber"
+  />
+  <StatCard
+    label="Owed To Riders"
+    value={`₦${totalOwedRiders.toLocaleString()}`}
+    sub="Unpaid wallet balances"
+    icon={Truck}
+    tone="amber"
+  />
+  <StatCard
+    label="Total Platform Revenue"
+    value={`₦${revenue.platform_total.toLocaleString()}`}
+    sub="Student fees + vendor & rider commission combined"
+    icon={Layers}
+    tone="emerald"
+  />
+</div>
+
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-800 p-1 ">
+      <div className="flex gap-2 border-b border-slate-800 p-1">
         {['vendors', 'riders'].map((t) => (
           <button
             key={t}

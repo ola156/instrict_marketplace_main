@@ -14,6 +14,7 @@ export default async function WalletsPage() {
     { data: paidOrders },
     { data: completedErrands },
     { data: riderFeeTx },
+    { data: vendorFeeTx },
   ] = await Promise.all([
     supabase
       .from('vendor_wallet')
@@ -37,24 +38,25 @@ export default async function WalletsPage() {
       .from('orders')
       .select('subtotal, delivery_fee, service_charge, total')
       .eq('payment_status', 'paid'),
-    // Completed errands — previously never queried here at all, so
-    // errand volume/fees were invisible to the admin dashboard.
+    // total_charged = reward + service_charge — the actual amount the
+    // student paid at posting time. Used for "money in", not just the
+    // 3% fee slice.
     supabase
       .from('errands')
-      .select('reward')
+      .select('reward, service_charge, total_charged')
       .eq('status', 'completed'),
-    // Rider-side platform fee (5% orders / 3% errands), now stored as
-    // structured columns on the ledger rather than buried in a text
-    // description — see credit_rider_on_delivery /
-    // credit_rider_on_errand_completion.
     supabase
       .from('rider_wallet_transactions')
       .select('source_type, gross_amount, platform_fee')
       .in('type', ['order_earning', 'errand_earning']),
+    supabase
+      .from('vendor_wallet_transactions')
+      .select('gross_amount, platform_fee')
+      .eq('type', 'order_earning'),
   ]);
 
-  // Vendor-side revenue (commission baked into the order's service_charge
-  // column at checkout time) — unchanged from before.
+  // Student-side revenue (service charge added on top at checkout — 3%
+  // of subtotal), plus order totals for the "money in" figure below.
   const revenue = (paidOrders || []).reduce(
     (acc, o) => ({
       subtotal: acc.subtotal + Number(o.subtotal || 0),
@@ -65,16 +67,19 @@ export default async function WalletsPage() {
     { subtotal: 0, delivery_fee: 0, service_charge: 0, total: 0 }
   );
 
-  // Errand gross volume — total rewards paid out across completed errands,
-  // independent of the rider fee (mirrors delivery_fee above for orders).
-  const errandVolume = (completedErrands || []).reduce(
-    (sum, e) => sum + Number(e.reward || 0),
-    0
+  // Errand gross volume (rewards), student service charge, and total
+  // charged (what the student actually paid), each summed separately.
+  const errandTotals = (completedErrands || []).reduce(
+    (acc, e) => ({
+      volume: acc.volume + Number(e.reward || 0),
+      service_charge: acc.service_charge + Number(e.service_charge || 0),
+      // Fall back to reward + service_charge for any older rows where
+      // total_charged might not have been backfilled.
+      total_charged: acc.total_charged + Number(e.total_charged ?? (Number(e.reward || 0) + Number(e.service_charge || 0))),
+    }),
+    { volume: 0, service_charge: 0, total_charged: 0 }
   );
 
-  // Rider-side platform fee, split by source so the admin can see order
-  // delivery fees and errand fees as separate line items, plus a combined
-  // total.
   const riderFees = (riderFeeTx || []).reduce(
     (acc, tx) => {
       const fee = Number(tx.platform_fee || 0);
@@ -86,13 +91,28 @@ export default async function WalletsPage() {
     { orders: 0, errands: 0, total: 0 }
   );
 
-  revenue.errand_volume = errandVolume;
+  const vendorFees = (vendorFeeTx || []).reduce(
+    (sum, tx) => sum + Number(tx.platform_fee || 0),
+    0
+  );
+
+  revenue.errand_volume = errandTotals.volume;
+  revenue.errand_service_charge = errandTotals.service_charge;
+  revenue.errand_total_charged = errandTotals.total_charged;
   revenue.rider_fee_orders = riderFees.orders;
   revenue.rider_fee_errands = riderFees.errands;
   revenue.rider_fee_total = riderFees.total;
-  // All platform income combined: vendor commission (service_charge) +
-  // rider-side delivery/errand fees.
-  revenue.platform_total = revenue.service_charge + riderFees.total;
+  revenue.vendor_fee_orders = vendorFees;
+
+  // Platform's own cut only — student fees + vendor/rider commission.
+  revenue.platform_total =
+    revenue.service_charge + revenue.errand_service_charge + riderFees.total + vendorFees;
+
+  // ALL cash that flowed into the app — full order totals (subtotal +
+  // delivery + service charge) plus full errand totals (reward + service
+  // charge). Includes money that will later be paid back out to vendors
+  // and riders, unlike platform_total above.
+  revenue.total_income = revenue.total + revenue.errand_total_charged;
 
   return (
     <WalletsClient

@@ -3,7 +3,7 @@ import { initializeTransaction } from '@/lib/paystack';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
-const SERVICE_CHARGE_PERCENT = 5;
+const SERVICE_CHARGE_PERCENT = 3;
 
 export async function POST(req) {
   const supabase = await createClient();

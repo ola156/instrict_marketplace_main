@@ -82,6 +82,18 @@ function fmtDate(d) {
   });
 }
 
+// Adds minutes to a date/timestamp and returns a new Date.
+function addMinutes(date, minutes) {
+  return new Date(new Date(date).getTime() + minutes * 60000);
+}
+
+// Formats a Date as a full weekday + day + month, e.g. "Thursday, 7 Aug".
+function fmtDay(d) {
+  return new Date(d).toLocaleDateString('en-NG', {
+    weekday: 'long', day: 'numeric', month: 'short',
+  });
+}
+
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -105,9 +117,9 @@ export default function OrderDetailPage() {
           subtotal, delivery_fee, service_charge, total,
           payment_status, note, created_at, dropoff_code, rider_id,
           order_type, description, line_items, file_urls,
-          vendor:vendor_id(legal_name, avatar_url, store_address, landmark, category),
+          vendor:vendor_id(legal_name, avatar_url, store_address, landmark, category, support_phone),
           rider:rider_id(full_name, phone),
-          order_items(id, name, quantity, unit_price, selected_extras)
+          order_items(id, name, quantity, unit_price, selected_extras, menu_item_id, menu_items(estimated_duration_minutes))
         `)
         .eq('id', orderId)
         .single();
@@ -190,6 +202,24 @@ export default function OrderDetailPage() {
 
   const showRiderCard = order.fulfillment_type === 'delivery' && order.rider && !!order.rider_id;
 
+  // Estimated arrival for retail orders — sourced from each line item's
+  // menu_items.estimated_duration_minutes, taken from the slowest item
+  // in the order (the order isn't complete until every item is ready)
+  // and added on top of when the order was placed.
+  const estimatedArrivalDate = isRetail
+    ? (() => {
+        const durations = (order.order_items || [])
+          .map((item) => item.menu_items?.estimated_duration_minutes)
+          .filter((m) => typeof m === 'number' && m > 0);
+        if (durations.length === 0) return null;
+        const maxMinutes = Math.max(...durations);
+        return addMinutes(order.created_at, maxMinutes);
+      })()
+    : null;
+
+  const showVendorPickupPhone =
+    order.fulfillment_type === 'pickup' && !!order.vendor?.support_phone;
+
   return (
     <div className="w-full max-w-lg mx-auto px-4 pt-5 pb-10">
       <div className="flex items-center gap-3 mb-5">
@@ -245,6 +275,24 @@ export default function OrderDetailPage() {
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Estimated arrival — retail orders only, derived from
+          menu_items.estimated_duration_minutes for the items ordered */}
+      {isRetail && estimatedArrivalDate && order.status !== 'cancelled' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+            <Truck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Estimated arrival
+            </p>
+            <p className="text-xs font-black text-slate-900 dark:text-white mt-0.5">
+              {fmtDay(estimatedArrivalDate)}
+            </p>
           </div>
         </div>
       )}
@@ -356,7 +404,7 @@ export default function OrderDetailPage() {
               <span className="text-white text-xs font-black">{order.vendor.legal_name?.[0]}</span>
             </div>
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-black text-slate-900 dark:text-white truncate">
               {order.vendor.legal_name}
             </p>
@@ -367,6 +415,14 @@ export default function OrderDetailPage() {
               </p>
             )}
           </div>
+          {showVendorPickupPhone && (
+            <a
+              href={`tel:${order.vendor.support_phone}`}
+              className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shrink-0"
+            >
+              <Phone className="w-4 h-4 text-white" />
+            </a>
+          )}
         </div>
       )}
 

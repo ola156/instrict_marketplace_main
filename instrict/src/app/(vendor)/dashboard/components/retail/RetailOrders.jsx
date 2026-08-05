@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Package, Truck, Store, CheckCircle2, MapPin, Clock, Loader2 } from 'lucide-react';
+import { Package, Truck, Store, CheckCircle2, MapPin, Clock, Loader2 , User} from 'lucide-react';
 
 // Real status flow, matching orders_status_check. Retail has no "cooking"
 // stage — an order goes straight from confirmed to ready (packed).
@@ -117,6 +117,23 @@ function OrderCard({ order, onAdvance, busy }) {
           <MapPin className="w-3 h-3" /> {order.delivery_hostel || order.delivery_address || 'Address on file'}
         </div>
       )}
+      {/* Pickup contact — vendor needs to know who's collecting */}
+{!isDelivery && order.student && (
+  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 border-t border-slate-50 dark:border-slate-800 pt-2.5">
+    <User className="w-3 h-3 shrink-0" />
+    <span className="font-bold text-slate-700 dark:text-slate-300 truncate">
+      {order.student.full_name}
+    </span>
+    {order.student.phone && (
+      <a
+        href={`tel:${order.student.phone}`}
+        className="ml-auto text-blue-500 dark:text-blue-400 font-black shrink-0"
+      >
+        {order.student.phone}
+      </a>
+    )}
+  </div>
+)}
 
       {order.note && (
         <p className="text-[11px] text-slate-400 italic border-t border-slate-50 dark:border-slate-800 pt-2.5">
@@ -191,7 +208,8 @@ export default function RetailOrders({ vendorUserId }) {
         id, status, fulfillment_type, delivery_address, delivery_hostel,
         subtotal, delivery_fee, service_charge, total, payment_status,
         note, created_at, accepted_at, ready_at, picked_up_at,
-        order_items(id, name, unit_price, quantity, selected_extras)
+        order_items(id, name, unit_price, quantity, selected_extras),
+         student:student_profiles(full_name, phone)
       `)
       .eq('vendor_id', vendorUserId)
       .eq('order_type', 'standard')

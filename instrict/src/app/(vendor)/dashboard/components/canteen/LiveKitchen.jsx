@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
-  Clock, CheckCircle2, ChefHat, Bell, Truck, Store, X, MapPin, Loader2,
+  Clock, CheckCircle2, ChefHat, Bell, Truck, Store, X, MapPin, Loader2, Phone,
 } from 'lucide-react';
 
 const statusBadge = {
@@ -63,6 +63,10 @@ function OrderCard({ order, onStatusChange, busy }) {
   const isBusy = busy === order.id;
   const isTerminal = ['picked_up', 'delivered', 'cancelled'].includes(order.status);
 
+  // Pickup orders show the student's phone so the vendor can reach them
+  // directly (e.g. when the order is ready, or to confirm details).
+ const showStudentPhone = !isDelivery && !!order.student?.phone;
+
   const handleAdvance = () => action?.next && onStatusChange(order.id, action.next);
   const handleCancel = () => onStatusChange(order.id, 'cancelled');
 
@@ -93,7 +97,7 @@ function OrderCard({ order, onStatusChange, busy }) {
           </p>
         </div>
         <p className="text-sm font-black text-slate-900 dark:text-white shrink-0">
-          ₦{Number(order.total).toLocaleString()}
+          ₦{Number(order.subtotal).toLocaleString()}
         </p>
       </div>
 
@@ -110,6 +114,22 @@ function OrderCard({ order, onStatusChange, busy }) {
             <span className="truncate">{order.delivery_hostel || 'Hostel TBD'}</span>
           </span>
         )}
+       {showStudentPhone && (
+  <div className="flex items-center gap-2 shrink-0">
+    {order.student.full_name && (
+      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
+        {order.student.full_name}
+      </span>
+    )}
+    <a
+      href={`tel:${order.student.phone}`}
+      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400"
+    >
+      <Phone className="w-3 h-3 shrink-0" />
+      {order.student.phone}
+    </a>
+  </div>
+)}
       </div>
 
       {/* Items */}
@@ -207,8 +227,9 @@ export default function LiveKitchen({ vendorUserId }) {
     const { data } = await supabase
       .from('orders')
       .select(`
-        id, status, fulfillment_type, delivery_hostel, total, note, created_at, payment_status,
-        order_items (id, name, quantity, unit_price, selected_extras)
+        id, status, subtotal, fulfillment_type, delivery_hostel, total, note, created_at, payment_status,
+        order_items (id, name, quantity, unit_price, selected_extras),
+        student:student_profiles(full_name, phone)
       `)
       .eq('vendor_id', vendorUserId)
       .eq('order_type', 'standard')

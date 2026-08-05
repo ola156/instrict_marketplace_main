@@ -136,35 +136,37 @@ function ProductCard({ product }) {
   return (
     <Link
       href={`vendors/marketplace/product/${product.id}`}
-      className="flex flex-col rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+      className="flex flex-col h-full rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-sm transition-all"
     >
-      {/* Image container — fixed height, image contained inside it */}
-      <div className="relative  w-full h-50 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+      {/* Image container — fixed height, image covers it */}
+      <div className="relative w-full h-40 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
         {product.image_url ? (
           <img
             src={product.image_url}
             alt={product.name}
-            className="w-full h-full"
-            style={{ objectFit: 'cover' }}
+            className="w-full h-full object-cover"
           />
         ) : (
           <ShoppingBag className="w-8 h-8 text-slate-300" />
         )}
       </div>
 
-      {/* Text container — separate, sits below */}
-      <div className="p-2.5 space-y-1">
-        <p className="text-xs font-bold leading-tight line-clamp-2 text-slate-900 dark:text-white">
+      {/* Text container — flex-1 so it fills remaining space, pushing
+          price/category to the same spot regardless of name length */}
+      <div className="flex flex-col flex-1 p-2.5">
+        <p className="text-xs font-bold leading-tight line-clamp-2 min-h-[2.2em] text-slate-900 dark:text-white">
           {product.name}
         </p>
-        <p className="text-sm font-black text-slate-900 dark:text-white">
-          ₦{Number(product.base_price).toLocaleString()}
-        </p>
-        {product.category && (
-          <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-            {product.category}
-          </span>
-        )}
+        <div className="mt-auto pt-1.5 space-y-1">
+          <p className="text-sm font-black text-slate-900 dark:text-white">
+            ₦{Number(product.base_price).toLocaleString()}
+          </p>
+          {product.category && (
+            <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              {product.category}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   );

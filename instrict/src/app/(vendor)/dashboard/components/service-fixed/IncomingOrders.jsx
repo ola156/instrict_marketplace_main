@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
   FileText, Download, CheckCircle2, Clock, Truck, Store,
-  MapPin, ClipboardList, Loader2,
+  MapPin, ClipboardList, Loader2, User
 } from 'lucide-react';
 
 function getNextAction(order) {
@@ -71,12 +71,29 @@ function OrderCard({ order, onAdvance, busy }) {
         </span>
       </div>
 
-      {isDelivery && (
-        <div className="flex items-start gap-2 text-[11px] text-slate-400 px-1">
-          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>{order.delivery_hostel || order.delivery_address || 'Address on file'}</span>
-        </div>
-      )}
+    {isDelivery && (
+  <div className="flex items-start gap-2 text-[11px] text-slate-400 px-1">
+    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+    <span>{order.delivery_hostel || order.delivery_address || 'Address on file'}</span>
+  </div>
+)}
+
+{!isDelivery && order.student && (
+  <div className="flex items-center gap-2 text-[11px] text-slate-500 px-1">
+    <User className="w-3.5 h-3.5 shrink-0" />
+    <span className="font-bold text-slate-700 dark:text-slate-300 truncate">
+      {order.student.full_name}
+    </span>
+    {order.student.phone && (
+      <a
+        href={`tel:${order.student.phone}`}
+        className="ml-auto text-blue-500 dark:text-blue-400 font-black shrink-0"
+      >
+        {order.student.phone}
+      </a>
+    )}
+  </div>
+)}
 
     {files.length > 0 && (
         <div className="space-y-1.5">
@@ -213,7 +230,8 @@ export default function IncomingOrders({ vendorUserId }) {
         id, status, fulfillment_type, delivery_address, delivery_hostel,
         subtotal, delivery_fee, service_charge, total, payment_status,
         note, description, line_items, file_urls, file_url,
-        created_at, ready_at, accepted_at, picked_up_at
+        created_at, ready_at, accepted_at, picked_up_at,
+         student:student_profiles(full_name, phone)
       `)
       .eq('vendor_id', vendorUserId)
       .eq('order_type', 'print')

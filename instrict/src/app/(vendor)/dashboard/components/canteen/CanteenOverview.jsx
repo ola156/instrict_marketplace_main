@@ -49,14 +49,14 @@ export default function CanteenOverview({ vendorUserId }) {
 
     const { data: orders } = await supabase
       .from('orders')
-      .select('id, status, total, created_at, payment_status')
+      .select('id, status, total, subtotal, created_at, payment_status')
       .eq('vendor_id', vendorUserId)
       .gte('created_at', today.toISOString())
       .order('created_at', { ascending: false });
 
     if (orders) {
       const paid = orders.filter(o => o.payment_status === 'paid');
-      const todayEarnings = paid.reduce((sum, o) => sum + Number(o.total), 0);
+      const todayEarnings = paid.reduce((sum, o) => sum + Number(o.subtotal), 0);
       const pending = orders.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status));
       const completed = orders.filter(o => ['delivered', 'picked_up'].includes(o.status));
 
@@ -162,7 +162,7 @@ export default function CanteenOverview({ vendorUserId }) {
                       {cfg.label}
                     </span>
                     <span className="text-xs font-black text-slate-900 dark:text-white">
-                      ₦{Number(order.total).toLocaleString()}
+                      ₦{Number(order.subtotal).toLocaleString()}
                     </span>
                   </div>
                 </div>

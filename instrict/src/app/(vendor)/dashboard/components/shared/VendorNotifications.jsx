@@ -49,25 +49,32 @@ const typeConfig = {
 // Vendor dashboard has no per-section routes — everything lives inside
 // /dashboard behind an activeSection/onSectionChange state toggle. So
 // instead of a URL, this resolves to { section, postId? } and the parent
-// CanteenDashboard is responsible for calling onSectionChange and, for
+// dashboard component is responsible for calling onSectionChange and, for
 // community posts, stashing postId so it can hand it to CommunityFeed as
 // a highlightPostId prop.
 //
-// Routing is deliberately type-specific rather than order_id-generic:
-// payment_confirmed is about money (Wallet), new_order/status_changed are
-// about fulfilling the order (Kitchen). Adjust here if that's wrong for
-// your flow — this is the only place that mapping lives.
-function resolveDestination(n) {
-  if (n.related_post_id) return { section: 'community', postId: n.related_post_id };
-  if (n.type === 'payment_confirmed') return { section: 'wallet' };
-  if (n.order_id) return { section: 'kitchen' };
+// Section NAMES differ per vendor dashboard type (Canteen has 'kitchen',
+// FixedService has 'orders', VariableService has neither) — so this takes
+// a sectionMap prop instead of hardcoding names. Pass one from whichever
+// dashboard renders this component; see DEFAULT_SECTION_MAP for the shape.
+const DEFAULT_SECTION_MAP = {
+  order: 'kitchen',       // new_order, status_changed land here
+  payment: 'wallet',      // payment_confirmed lands here
+  community: 'community', // community_tag/comment/like land here
+};
+
+function resolveDestination(n, sectionMap) {
+  const map = { ...DEFAULT_SECTION_MAP, ...sectionMap };
+  if (n.related_post_id) return { section: map.community, postId: n.related_post_id };
+  if (n.type === 'payment_confirmed') return { section: map.payment };
+  if (n.order_id) return { section: map.order };
   return null;
 }
 
-function NotificationRow({ notification, onClick, onDelete }) {
+function NotificationRow({ notification, onClick, onDelete, sectionMap }) {
   const cfg = typeConfig[notification.type] || typeConfig.new_order;
   const Icon = cfg.icon;
-  const clickable = !!resolveDestination(notification);
+  const clickable = !!resolveDestination(notification, sectionMap);
 
   return (
     <div
@@ -117,7 +124,7 @@ function NotificationRow({ notification, onClick, onDelete }) {
   );
 }
 
-export default function VendorNotifications({ vendor, onNavigate }) {
+export default function VendorNotifications({ vendor, onNavigate, sectionMap }) {
   const supabase = createClient();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +168,7 @@ export default function VendorNotifications({ vendor, onNavigate }) {
 
   const handleClick = (notification) => {
     if (!notification.is_read) markRead(notification.id);
-    const dest = resolveDestination(notification);
+    const dest = resolveDestination(notification, sectionMap);
     if (dest) onNavigate?.(dest.section, { postId: dest.postId });
   };
 
@@ -278,6 +285,7 @@ export default function VendorNotifications({ vendor, onNavigate }) {
                 notification={notification}
                 onClick={handleClick}
                 onDelete={deleteNotification}
+                sectionMap={sectionMap}
               />
             ))}
           </div>

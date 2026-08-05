@@ -28,7 +28,11 @@ export async function updateSession(request) {
   // IMPORTANT: do not run code between createServerClient and
   // supabase.auth.getUser(). A simple mistake could cause random
   // logouts.
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  // Returned alongside the response so middleware.js can gate protected
+  // routes on it. Previously this was discarded entirely — the session
+  // cookie got refreshed but nothing ever checked whether a user existed,
+  // so every page route was reachable regardless of auth state.
+  return { response: supabaseResponse, user };
 }

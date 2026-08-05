@@ -107,7 +107,7 @@ export async function createOrderFromMetadata(supabase, reference, metadata) {
   notifyVendorOfNewOrder(supabase, order).catch((err) => console.error('[push] vendor notify error:', err));
   notifyAdminsOfActivity(supabase, {
     title: 'New order placed',
-    body: `A new order worth ₦${order.total.toLocaleString()} was just placed.`,
+    body: `A new order worth ₦${order.subtotal.toLocaleString()} was just placed.`,
   }).catch((err) => console.error('[push] admin notify error:', err));
 
   return { order, alreadyExisted: false };
@@ -126,7 +126,7 @@ async function notifyVendorOfNewOrder(supabase, order) {
   await sendPushToTokens(
     supabase,
     [vendor.fcm_token],
-    { title: 'New order received', body: `You've got a new order worth ₦${order.total.toLocaleString()}.` },
+    { title: 'New order received', body: `You've got a new order worth ₦${order.subtotal.toLocaleString()}.` },
     'vendor_profiles'
   );
 }

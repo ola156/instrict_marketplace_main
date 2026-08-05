@@ -19,13 +19,20 @@ const typeConfig = {
 // component). Add an entry here rather than hardcoding paths inline —
 // vendor doesn't belong in this map at all since it has no routes (see
 // VendorNotifications.js, which resolves to a section instead of a URL).
+//
+// Every entry MUST be a function, even ones that ignore the id — order and
+// community are both called as routes.order(id) / routes.community(id) in
+// resolveDestination below. A plain string here throws a TypeError the
+// moment someone clicks that notification type.
 const PORTAL_ROUTES = {
   student: {
     order: (id) => `/orders/${id}`,
     community: (id) => `/community?highlight=${id}`,
   },
   rider: {
-    order:`/jobs`,
+    // NOTE: assumed /jobs has no per-job detail route yet (never confirmed) —
+    // change to `(id) => \`/jobs/${id}\`` once that route exists.
+    order: () => `/jobs`,
     community: (id) => `/runner/community?highlight=${id}`,
   },
 };

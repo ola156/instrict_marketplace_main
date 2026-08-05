@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
   Wallet, TrendingUp, Clock, ArrowDownLeft, Search, CreditCard,
-  User, Save, CheckCircle2, AlertCircle, Ban, ShieldCheck, Loader2,
+  Lock, Save, CheckCircle2, AlertCircle, Ban, ShieldCheck, Loader2,
 } from 'lucide-react';
 
 const inputClass = "w-full h-10 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all";
@@ -17,7 +17,7 @@ const MIN_PAYOUT = 5000;
 // order, before crediting their wallet. Must match whatever percentage is
 // actually applied inside the `credit_vendor_on_payment` trigger — this
 // constant is for display only and doesn't move any money itself.
-const PLATFORM_COMMISSION_PERCENT = 5;
+const PLATFORM_COMMISSION_PERCENT = 3;
 
 function StatCard({ label, value, sub, icon: Icon, color }) {
   return (
@@ -36,19 +36,33 @@ function StatCard({ label, value, sub, icon: Icon, color }) {
   );
 }
 
+// Whether an order's cut has actually been released into withdrawable
+// balance yet, mirroring the completion condition in
+// `settle_vendor_held_balance` — pickup orders release on picked_up,
+// delivery orders release on delivered. Purely cosmetic here (a badge),
+// the DB trigger is the actual source of truth for the money itself.
+function isReleased(order) {
+  return order.fulfillment_type === 'delivery'
+    ? order.status === 'delivered'
+    : order.status === 'picked_up';
+}
+
 function TransactionRow({ order }) {
   const gross = Number(order.subtotal);
   // Display-only estimate of what actually landed in the wallet after the
   // platform commission. The real number of truth is whatever
-  // `credit_vendor_on_payment` actually credited — this is just showing
-  // the vendor the same math up front so the wallet total isn't a surprise.
+  // `credit_vendor_on_payment` / `settle_vendor_held_balance` actually
+  // moved — this is just showing the vendor the same math up front.
   const net = gross * (1 - PLATFORM_COMMISSION_PERCENT / 100);
+  const released = isReleased(order);
 
   return (
     <div className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500">
-          <ArrowDownLeft className="w-4 h-4" />
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+          released ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-400/10 text-slate-400'
+        }`}>
+          {released ? <ArrowDownLeft className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
         </div>
         <div className="space-y-0.5">
           <p className="text-xs font-bold text-slate-900 dark:text-white">
@@ -62,11 +76,11 @@ function TransactionRow({ order }) {
         </div>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+        <p className={`text-sm font-black ${released ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
           +₦{net.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </p>
         <p className="text-[10px] text-slate-400">
-          ₦{gross.toLocaleString()} − {PLATFORM_COMMISSION_PERCENT}% fee
+          {released ? 'Available' : 'Held until completed'}
         </p>
       </div>
     </div>
@@ -177,13 +191,18 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
   const [payoutIsError, setPayoutIsError] = useState(false);
   const [requestedToday, setRequestedToday] = useState(false);
 
+  // Most recent withdrawal request, so a rejection reason can be shown
+  // to the vendor even after `requestedToday` no longer blocks the form
+  // (i.e. the day after a rejection).
+  const [latestRequest, setLatestRequest] = useState(null);
+
   useEffect(() => {
     if (!vendor?.user_id) return;
 
     fetchData();
 
-    // Keep balance/history live as orders get paid or refunded, instead of
-    // only reflecting reality on page load.
+    // Keep balance/history live as orders get paid, completed, or
+    // refunded, instead of only reflecting reality on page load.
     const channel = supabase
       .channel(`vendor-wallet-${vendor.user_id}`)
       .on('postgres_changes', {
@@ -192,6 +211,10 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
       }, fetchData)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'vendor_wallet',
+        filter: `vendor_id=eq.${vendor.user_id}`,
+      }, fetchData)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'vendor_withdrawal_requests',
         filter: `vendor_id=eq.${vendor.user_id}`,
       }, fetchData)
       .subscribe();
@@ -211,11 +234,16 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
   const fetchData = async () => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
 
-    const [{ data: walletData }, { data: ordersData }, { count: todaysRequests }] = await Promise.all([
+    const [
+      { data: walletData },
+      { data: ordersData },
+      { count: todaysRequests },
+      { data: latestRequestData },
+    ] = await Promise.all([
       supabase.from('vendor_wallet').select('*').eq('vendor_id', vendor.user_id).single(),
       supabase
         .from('orders')
-        .select('id, subtotal, payment_status, created_at, status')
+        .select('id, subtotal, payment_status, fulfillment_type, status, created_at')
         .eq('vendor_id', vendor.user_id)
         .eq('payment_status', 'paid')
         .order('created_at', { ascending: false })
@@ -228,9 +256,19 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
         .select('*', { count: 'exact', head: true })
         .eq('vendor_id', vendor.user_id)
         .gte('created_at', todayStart.toISOString()),
+      // Most recent request regardless of date, so a rejection reason
+      // still surfaces the next day once the daily block has lifted.
+      supabase
+        .from('vendor_withdrawal_requests')
+        .select('status, rejection_reason, processed_at')
+        .eq('vendor_id', vendor.user_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     setRequestedToday((todaysRequests || 0) > 0);
+    setLatestRequest(latestRequestData);
 
     if (walletData) {
       setWallet(walletData);
@@ -320,12 +358,11 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
 
   // ── Payout gating ──
   // NOTE: these are UX-only guards. The actual limits (minimum amount,
-  // once per day) must also live inside `request_vendor_withdrawal` in
-  // Postgres — otherwise anyone can call the RPC directly and skip this
-  // entirely. This requires a timestamp column on vendor_wallet (e.g.
-  // `last_withdrawal_requested_at`) that the RPC sets on each successful
-  // request, since I don't yet know if that column exists.
+  // once per day, sufficient balance) must also live inside
+  // `request_vendor_withdrawal` in Postgres — otherwise anyone can call
+  // the RPC directly and skip this entirely.
   const balance = Number(wallet?.balance || 0);
+  const heldBalance = Number(wallet?.held_balance || 0);
   const belowMinimum = balance < MIN_PAYOUT;
   const payoutBlockedReason = requestedToday
     ? 'You can only request one withdrawal per day — try again tomorrow.'
@@ -390,8 +427,8 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {[...Array(3)].map((_, i) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-slate-100 dark:bg-slate-800 rounded-2xl h-28 animate-pulse" />
         ))}
       </div>
@@ -416,11 +453,12 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
       <div className="flex items-start gap-2.5 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3.5">
         <Wallet className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
         <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400">
-          Instrict takes a {PLATFORM_COMMISSION_PERCENT}% platform fee from every completed order before it's credited to your wallet.
+          Instrict takes a {PLATFORM_COMMISSION_PERCENT}% platform fee from every paid order. Your share is held
+          until the order is completed (picked up or delivered), then it moves to your available balance.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Available balance"
           value={`₦${balance.toLocaleString()}`}
@@ -429,18 +467,25 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
           color="bg-blue-500/10 text-blue-500"
         />
         <StatCard
+          label="Held until completed"
+          value={`₦${heldBalance.toLocaleString()}`}
+          sub="Released on pickup/delivery"
+          icon={Lock}
+          color="bg-slate-500/10 text-slate-500"
+        />
+        <StatCard
+          label="Pending payout"
+          value={`₦${Number(wallet?.pending_payout || 0).toLocaleString()}`}
+          sub="Withdrawal being processed"
+          icon={Clock}
+          color="bg-amber-500/10 text-amber-500"
+        />
+        <StatCard
           label="Total earned"
           value={`₦${totalEarned.toLocaleString()}`}
           sub="Your item sales only"
           icon={TrendingUp}
           color="bg-emerald-500/10 text-emerald-500"
-        />
-        <StatCard
-          label="Pending payout"
-          value={`₦${Number(wallet?.pending_payout || 0).toLocaleString()}`}
-          sub="Being processed"
-          icon={Clock}
-          color="bg-amber-500/10 text-amber-500"
         />
       </div>
 
@@ -551,6 +596,16 @@ export default function VendorWallet({ vendor, isSuspended = false }) {
                   </div>
                 )}
               </div>
+
+              {latestRequest?.status === 'rejected' && latestRequest?.rejection_reason && (
+                <div className="flex items-start gap-2 rounded-xl bg-rose-500/5 border border-rose-500/20 px-4 py-3">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[11px] font-black text-rose-600 dark:text-rose-400">Your last withdrawal was declined</p>
+                    <p className="text-[11px] font-bold text-rose-500 mt-0.5">{latestRequest.rejection_reason}</p>
+                  </div>
+                </div>
+              )}
 
               {payoutBlockedReason && !isSuspended && (
                 <div className="flex items-start gap-2 rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3">

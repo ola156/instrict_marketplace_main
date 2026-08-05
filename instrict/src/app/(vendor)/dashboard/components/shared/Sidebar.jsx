@@ -43,7 +43,6 @@ const serviceFixedNav = [
   { label: 'Overview',      icon: LayoutDashboard, section: 'overview' },
   { label: 'Incoming Jobs', icon: ClipboardList,   section: 'orders' },
   { label: 'Price Matrix',  icon: Tags,            section: 'pricing' },
-  { label: 'Portfolio',     icon: ImageIcon,       section: 'portfolio' },
   { label: 'Wallet',        icon: Wallet,          section: 'wallet' },
   { label: 'Notifications', icon: Bell,            section: 'notifications' },
   { label: 'Community',     icon: Rss,             section: 'community' },

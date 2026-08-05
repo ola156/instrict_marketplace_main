@@ -8,7 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 
 const inputClass = "w-full h-11 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all";
 
-const SERVICE_CHARGE_PERCENT = 0.05;
+const SERVICE_CHARGE_PERCENT = 0.03;
 
 export default function CheckoutPage() {
   const router = useRouter();

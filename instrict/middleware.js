@@ -19,6 +19,48 @@ const generalLimiter = new Ratelimit({
 // endpoints — those are rate-limited by Supabase already)
 const RATE_LIMITED_PREFIXES = ['/api/'];
 
+// Anyone, logged in or not, can view these. Prefix-matched — '/auth'
+// covers /auth/student, /auth/vendor, /auth/rider, and anything nested
+// under them (reset password, callback pages, etc). Add any other
+// public page (marketing, terms, privacy) here explicitly.
+//
+// DEFAULT-DENY: anything NOT listed here or in PORTAL_ROUTES below gets
+// redirected to '/' for an unauthenticated visitor. That's deliberate —
+// a page you forgot to list here shows up immediately as "why does this
+// redirect", which is a loud, obvious bug. The alternative (default-allow)
+// means a forgotten page stays silently exposed to the world, which is a
+// much worse failure mode to have.
+const PUBLIC_PATHS = ['/', '/auth'];
+
+// Maps a path prefix to the login page an unauthenticated visitor gets
+// bounced to. Order matters only in that more specific prefixes should
+// come first if any ever overlap — none do currently.
+const PORTAL_ROUTES = [
+  { prefix: '/home', login: '/auth/student' },
+  { prefix: '/community', login: '/auth/student' },
+  { prefix: '/orders', login: '/auth/student' },
+  { prefix: '/errands', login: '/auth/student' },
+  { prefix: '/profile', login: '/auth/student' },
+  { prefix: '/checkout', login: '/auth/student' },
+  { prefix: '/store', login: '/auth/student' },
+  { prefix: '/vendors', login: '/auth/student' },
+  { prefix: '/dashboard', login: '/auth/vendor' },
+  { prefix: '/onboarding/vendor', login: '/auth/vendor' },
+  { prefix: '/runner', login: '/auth/rider' },
+  { prefix: '/jobs', login: '/auth/rider' },
+];
+
+function isPublicPath(pathname) {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+
+function matchPortalLogin(pathname) {
+  const match = PORTAL_ROUTES.find(
+    (r) => pathname === r.prefix || pathname.startsWith(r.prefix + '/')
+  );
+  return match?.login;
+}
+
 function getIp(request) {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -35,26 +77,48 @@ export async function middleware(request) {
     pathname.startsWith('/favicon') ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|css|js)$/)
   ) {
-    return await updateSession(request);
+    const { response } = await updateSession(request);
+    return response;
   }
 
-  const needsLimit = RATE_LIMITED_PREFIXES.some(p => pathname.startsWith(p));
+  const isApiRoute = pathname.startsWith('/api/');
 
-  if (needsLimit) {
-    const ip = getIp(request);
-    const identifier = `${ip}:${pathname}`;
-    const { success } = await generalLimiter.limit(identifier);
-
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please slow down and try again.' },
-        { status: 429 }
-      );
+  if (isApiRoute) {
+    const needsLimit = RATE_LIMITED_PREFIXES.some((p) => pathname.startsWith(p));
+    if (needsLimit) {
+      const ip = getIp(request);
+      const identifier = `${ip}:${pathname}`;
+      const { success } = await generalLimiter.limit(identifier);
+      if (!success) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please slow down and try again.' },
+          { status: 429 }
+        );
+      }
     }
+    // API routes handle their own auth (supabase.auth.getUser() inside the
+    // route) and expect JSON responses, not redirects — the gate below is
+    // for page routes only.
+    const { response } = await updateSession(request);
+    return response;
   }
 
-  // Page routes (including all /auth/* pages) just get session refresh — no rate limiting
-  return await updateSession(request);
+  const { response, user } = await updateSession(request);
+
+  if (!user && !isPublicPath(pathname)) {
+    const loginPath = matchPortalLogin(pathname) || '/';
+    const redirectUrl = new URL(loginPath, request.url);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    // Carry over any cookie updates updateSession made (e.g. an expired
+    // session getting cleared) onto the redirect response — otherwise a
+    // stale cookie could stick around and cause a redirect loop.
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
+  }
+
+  return response;
 }
 
 export const config = {

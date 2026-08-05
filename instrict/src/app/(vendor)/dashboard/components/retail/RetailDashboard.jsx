@@ -86,7 +86,7 @@ export default function RetailDashboard({ vendor, activeSection, onSectionChange
       case 'orders':        return <RetailOrders vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'inventory':     return <ProductInventory vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'wallet':        return <VendorWallet vendor={vendor} isSuspended={isSuspended} />;
-      case 'notifications': return <VendorNotifications vendor={vendor} onNavigate={handleNotificationNavigate} />;
+      case 'notifications': return <VendorNotifications vendor={vendor} onNavigate={handleNotificationNavigate} sectionMap={{ order: 'orders', payment: 'wallet' }} />;
       case 'community':     return <CommunityFeed authorType="vendor" isSuspended={isSuspended} highlightPostId={highlightPostId} />;
       case 'settings':      return <VendorSettings vendor={vendor} onUpdate={onVendorUpdate} />;
       case 'help':          return <HelpDesk authorType="vendor" vendor={vendor} />;

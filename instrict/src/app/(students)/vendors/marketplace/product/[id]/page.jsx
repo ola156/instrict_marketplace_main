@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import {
   ChevronLeft, Heart, MapPin, ChevronRight,
-  ShoppingBag, Minus, Plus, Check, Star, X, Ban, AlertTriangle, Share2,
+  ShoppingBag, Minus, Plus, Check, Star, X, Ban, AlertTriangle, Share2, Clock,
 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 
@@ -110,7 +110,7 @@ export default function ProductDescriptionPage() {
     const [{ data: item }, { data: { user } }] = await Promise.all([
       supabase
         .from('menu_items')
-        .select('id,vendor_id,name,description,base_price,image_url,is_available,is_featured,category')
+        .select('id,vendor_id,name,description,base_price,image_url,is_available,is_featured,category,estimated_duration_minutes')
         .eq('id', id)
         .single(),
       supabase.auth.getUser(),
@@ -215,6 +215,11 @@ export default function ProductDescriptionPage() {
   // quantity steppers, which should always be usable.
   const variantAvailable = !hasVariants || (selectedVariant && selectedVariant.stock > 0);
   const canAdd = product?.is_available && canOrder && variantAvailable;
+
+  // Calculate order duration in days from estimated_duration_minutes
+  const durationDays = product?.estimated_duration_minutes
+    ? Math.max(1, Math.round(product.estimated_duration_minutes / 1440))
+    : null;
 
   // Deterministic line id: same product + same variant (or no variant) from
   // the same vendor always maps to the same cart line, so repeated adds
@@ -490,6 +495,19 @@ export default function ProductDescriptionPage() {
             </div>
           )}
 
+          {/* ── Order Duration ──────────────────────────────────────────────── */}
+          {durationDays && (
+            <div className="py-4 space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.13em] text-slate-400">Order Duration</p>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>
+                  {durationDays} {durationDays === 1 ? 'day' : 'days'}
+                </span>
+              </div>
+            </div>
+          )}
+
           {colors.length > 0 && (
             <div className="py-4 space-y-2">
               <div className="flex items-center justify-between">
@@ -649,9 +667,7 @@ export default function ProductDescriptionPage() {
       >
         <div className="max-w-lg mx-auto px-4 pb-3 pt-3 bg-white/95 dark:bg-slate-950 backdrop-blur border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
-            {/* Quantity steppers are always usable — NOT tied to canAdd, since
-                adjusting qty shouldn't require the product to be currently
-                addable (that was the bug causing everything to disable). */}
+            {/* Quantity steppers are always usable — NOT tied to canAdd */}
             <div className="flex items-center gap-3 px-1 shrink-0">
               <button
                 onClick={() => setQty(q => Math.max(1, q - 1))}
