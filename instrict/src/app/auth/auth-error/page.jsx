@@ -1,22 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ShieldAlert, ArrowLeft, RefreshCw, Home } from 'lucide-react';
 
-export default function AuthErrorPage() {
+export const dynamic = 'force-dynamic';
+
+function AuthErrorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || searchParams.get('type') || 'user';
 
-  // Determine where to send them back based on their portal role
   const getLoginPath = () => {
     switch (role) {
       case 'vendor': return '/auth/vendor';
       case 'rider': return '/auth/rider';
       case 'user':
       default:
-        return '/auth/student'; // Adjust to your specific student auth route if different
+        return '/auth/student';
     }
   };
 
@@ -31,7 +32,6 @@ export default function AuthErrorPage() {
   return (
     <main className="h-screen w-full flex flex-col md:flex-row overflow-hidden bg-white dark:bg-slate-950 text-slate-950 dark:text-white transition-colors duration-500 antialiased">
       
-      {/* BRANDING GRAPHIC COLUMN (DESKTOP) */}
       <section className="hidden md:flex flex-[0.9] p-16 flex-col justify-between text-white bg-gradient-to-br from-rose-600 via-indigo-950 to-slate-950 transition-all duration-500 relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(225,29,72,0.3),transparent_45%)]" />
         
@@ -60,11 +60,9 @@ export default function AuthErrorPage() {
         </div>
       </section>
 
-      {/* ERROR ACTION SHEET */}
       <section className="flex-1 flex justify-center items-center p-6 sm:p-8 md:p-12 bg-white dark:bg-slate-950 transition-colors duration-500 overflow-y-auto">
         <div className="w-full max-w-sm space-y-6">
 
-          {/* BACK BUTTON */}
           <button
             onClick={handleReturn}
             type="button"
@@ -107,5 +105,13 @@ export default function AuthErrorPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthErrorContent />
+    </Suspense>
   );
 }

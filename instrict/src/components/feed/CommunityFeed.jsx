@@ -21,7 +21,7 @@
 // which profile table they belong to. toggle_post_like(post_id, liker_type)
 // needs the viewer's own authorType passed in for the same reason.
 
-import { useEffect, useState, useRef } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import VerificationGate from '@/components/verification/VerificationGate';
@@ -30,10 +30,6 @@ import { Heart, MessageCircle, Image as ImageIcon, Send, X, Loader2, Trash2, Sto
 const CLOUD_NAME    = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-// Every profile table is keyed by user_id = auth.uid(), so author_id on
-// posts/comments is always the plain auth user id no matter who posted —
-// this map is the only thing that needs to grow if a new actor type
-// (e.g. a future admin account) ever needs to post too.
 const AUTHOR_PROFILE = {
   student: { table: 'student_profiles', nameField: 'full_name', fallback: 'Student', icon: GraduationCap, badgeClass: 'from-blue-500 to-blue-600' },
   vendor:  { table: 'vendor_profiles',  nameField: 'legal_name', fallback: 'Vendor',  icon: Store,          badgeClass: 'from-emerald-500 to-emerald-600' },
@@ -179,7 +175,6 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
     setShowComments(p => !p);
   };
 
-  // Live comments — only subscribed while this thread is actually open.
   useEffect(() => {
     if (!showComments) return;
     const channel = supabase
@@ -219,11 +214,6 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
       return;
     }
 
-    // Append right away rather than waiting on the realtime listener —
-    // that round-trip is what was showing up as "have to refresh."
-    // The dedupe check in the realtime handler (prev.some(c => c.id ===
-    // row.id)) means it's harmless if that event also arrives shortly
-    // after — it just won't add a second copy.
     const author_name = await fetchAuthorName(supabase, data.author_id, data.author_type);
     setComments(prev => (prev.some(c => c.id === data.id) ? prev : [...prev, { ...data, author_name }]));
 
@@ -233,7 +223,6 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
-      {/* Author */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${config.badgeClass} flex items-center justify-center shrink-0`}>
@@ -260,17 +249,14 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
         )}
       </div>
 
-      {/* Content */}
       <div className="px-4 pb-3">
         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{post.content}</p>
       </div>
 
-      {/* Image */}
       {post.image_url && (
         <img src={post.image_url} alt="Post" className="w-full max-h-80 object-cover" />
       )}
 
-      {/* Actions */}
       <div className="flex items-center gap-4 px-4 py-3 border-t border-slate-50 dark:border-slate-800">
         <button
           onClick={() => onLike(post.id, liked)}
@@ -298,7 +284,6 @@ function PostCard({ post, currentUserId, onDelete, onLike, suspended }) {
 
       {showLikes && <LikesModal likes={post.likes} onClose={() => setShowLikes(false)} />}
 
-      {/* Comments */}
       {showComments && (
         <div className="border-t border-slate-50 dark:border-slate-800 px-4 pb-4 space-y-3">
           {loadingComments ? (
@@ -438,16 +423,13 @@ function CreatePost({ currentUserId, authorType, onCreated, suspended }) {
   );
 }
 
-export default function CommunityFeed({ authorType = 'student', highlightPostId: highlightPostIdProp }) {
+function CommunityFeedInner({ authorType = 'student', highlightPostId: highlightPostIdProp }) {
   const supabase = createClient();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [suspended, setSuspended] = useState(false);
 
-  // Deep-linked from a notification click, e.g. /community?highlight=<post_id>.
-  // Read once on mount — if the user navigates within the feed afterward
-  // we don't want an old highlight param re-triggering the scroll.
   const searchParams = useSearchParams();
   const [highlightId, setHighlightId] = useState(null);
   const highlightedOnceRef = useRef(false);
@@ -464,9 +446,6 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
     if (user) {
       setCurrentUserId(user.id);
 
-      // Checked against the VIEWER's own profile table (matching authorType),
-      // not any post's author — the person looking at the feed is who might
-      // be suspended, regardless of who wrote what they're reading.
       const config = AUTHOR_PROFILE[authorType] || AUTHOR_PROFILE.student;
       const { data: profile } = await supabase
         .from(config.table)
@@ -491,25 +470,19 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
       return;
     }
 
-    // Each post is enriched using ITS OWN author_type, not the viewer's —
-    // a student browsing the feed still sees vendor/rider posts labeled
-    // and named correctly.
     const enriched = await Promise.all((data || []).map(async post => {
       const { community_comments, ...rest } = post;
       return {
         ...rest,
         comment_count: community_comments?.[0]?.count || 0,
         author_name: await fetchAuthorName(supabase, post.author_id, post.author_type),
-        viewerAuthorType: authorType, // used when the current viewer comments on this post
+        viewerAuthorType: authorType,
       };
     }));
     setPosts(enriched);
     setLoading(false);
   };
 
-  // Once the highlighted post has actually loaded into `posts`, scroll to
-  // it and clear the highlight after a few seconds. Guarded by a ref so a
-  // realtime update to `posts` later doesn't re-trigger the scroll.
   useEffect(() => {
     if (!highlightId || highlightedOnceRef.current) return;
     const match = posts.find(p => p.id === highlightId);
@@ -521,8 +494,6 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
     return () => clearTimeout(timer);
   }, [posts, highlightId]);
 
-  // Realtime: everyone with the feed open sees new posts, likes, and
-  // deletes as they happen, not just the person who took the action.
   useEffect(() => {
     const channel = supabase
       .channel('community-posts-feed')
@@ -533,9 +504,6 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'community_posts' }, (payload) => {
         const row = payload.new;
-        // Merge in the changed columns (likes, content, image_url, etc.)
-        // without touching author_name/viewerAuthorType, which aren't
-        // real columns and wouldn't be present on the incoming row.
         setPosts(prev => prev.map(p => (p.id === row.id ? { ...p, ...row } : p)));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_posts' }, (payload) => {
@@ -546,11 +514,6 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
     return () => { supabase.removeChannel(channel); };
   }, [authorType]);
 
-  // Comment counts stay live even when a thread is collapsed — this is
-  // deliberately separate from PostCard's own per-thread subscription
-  // (which only runs while that thread is open and appends full comment
-  // rows). Subscribing to every open thread individually would mean up
-  // to 30 channels at once; one shared channel just for counts is cheap.
   useEffect(() => {
     const channel = supabase
       .channel('community-comment-counts')
@@ -573,17 +536,11 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
       console.error('delete post error:', error);
       return;
     }
-    // The realtime DELETE listener above will also fire for this, but
-    // updating locally right away keeps the UI snappy for the deleter.
     setPosts(prev => prev.filter(p => p.id !== postId));
   };
 
   const handleLike = async (postId) => {
     if (suspended) return;
-    // liker_type is required so toggle_post_like can store {id, type} —
-    // without it the "liked by" modal wouldn't know which profile table
-    // to resolve this liker's name from. Routed through the API (rather
-    // than calling the RPC directly) so a new like can trigger a push.
     const res = await fetch('/api/community/likes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -646,5 +603,13 @@ export default function CommunityFeed({ authorType = 'student', highlightPostId:
         </div>
       )}
     </div>
+  );
+}
+
+export default function CommunityFeed(props) {
+  return (
+    <Suspense fallback={null}>
+      <CommunityFeedInner {...props} />
+    </Suspense>
   );
 }
