@@ -23,7 +23,6 @@ import OtpInput from '@/components/otp/OtpInput';
 
 const FIXED_SERVICE_SUBCATEGORIES = new Set([
   'Printing & Photocopying',
-  'Laundry & Dry Cleaning',
 ]);
 
 export default function VendorOnboarding() {
@@ -150,7 +149,7 @@ export default function VendorOnboarding() {
 
   const subCategoryDirectory = {
     retail: [
-      'Gadgets & Tech Accessories', 'Phones & Laptops', 'Thrift & Fashion Clothes',
+      'Gadgets & Tech Accessories', 'Thrift & Fashion Clothes',
       'Footwear & Sneakers', 'Groceries & Provisions', 'Stationery & Textbooks',
       'Cosmetics & Skincare', 'Beddings & Room Decor', 'Perfumes & Oils'
     ],
