@@ -24,13 +24,22 @@ const RATE_LIMITED_PREFIXES = ['/api/'];
 // under them (reset password, callback pages, etc). Add any other
 // public page (marketing, terms, privacy) here explicitly.
 //
+// '/campus' is the campus picker + per-campus landing page
+// (Header/Hero/Trust/Cta/Help/Footer — no auth-gated content). It must
+// be public: without it, an unauthenticated visitor hitting
+// /campus/:slug got redirected to '/' by the default-deny fallback
+// below, and since '/' itself immediately redirects logged-out-but-
+// campus-selected visitors back to /campus/:slug (via localStorage),
+// that produced an infinite redirect loop that looked like the page
+// was stuck loading.
+//
 // DEFAULT-DENY: anything NOT listed here or in PORTAL_ROUTES below gets
 // redirected to '/' for an unauthenticated visitor. That's deliberate —
 // a page you forgot to list here shows up immediately as "why does this
 // redirect", which is a loud, obvious bug. The alternative (default-allow)
 // means a forgotten page stays silently exposed to the world, which is a
 // much worse failure mode to have.
-const PUBLIC_PATHS = ['/', '/auth'];
+const PUBLIC_PATHS = ['/', '/auth', '/campus'];
 
 // Maps a path prefix to the login page an unauthenticated visitor gets
 // bounced to. Order matters only in that more specific prefixes should
