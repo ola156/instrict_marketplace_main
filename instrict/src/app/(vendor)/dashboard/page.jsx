@@ -12,6 +12,12 @@ import FixedServiceDashboard from './components/service-fixed/FixedServiceDashbo
 import VariableServiceDashboard from './components/service-variable/VariableServiceDashboard';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
+
+import * as Sentry from "@sentry/nextjs";
+
+Sentry.setTag("portal", "vendor");
+
+
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();

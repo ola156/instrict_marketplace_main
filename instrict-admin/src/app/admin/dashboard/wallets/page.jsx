@@ -137,7 +137,7 @@ export default async function WalletsPage() {
     orderIds.length
       ? supabase
           .from('orders')
-          .select('id, student_id, total, payment_status, cancelled_by, cancellation_reason, cancelled_at')
+          .select('id, student_id, total, service_charge, payment_status, cancelled_by, cancellation_reason, cancelled_at')
           .in('id', orderIds)
       : Promise.resolve({ data: [] }),
     vendorIds.length
@@ -146,13 +146,15 @@ export default async function WalletsPage() {
   ]);
 
   const studentIds = [...new Set((refundOrders || []).map((o) => o.student_id).filter(Boolean))];
+  // orders.student_id stores student_profiles.id (its own PK), not
+  // student_profiles.user_id — join on id, not user_id.
   const { data: refundStudents } = studentIds.length
-    ? await supabase.from('student_profiles').select('user_id, full_name').in('user_id', studentIds)
+    ? await supabase.from('student_profiles').select('id, full_name').in('id', studentIds)
     : { data: [] };
 
   const orderById = Object.fromEntries((refundOrders || []).map((o) => [o.id, o]));
   const vendorById = Object.fromEntries((refundVendors || []).map((v) => [v.user_id, v]));
-  const studentById = Object.fromEntries((refundStudents || []).map((s) => [s.user_id, s]));
+  const studentById = Object.fromEntries((refundStudents || []).map((s) => [s.id, s]));
 
   const refunds = reversalRows.map((tx) => {
     const order = orderById[tx.source_id] || null;
@@ -160,7 +162,11 @@ export default async function WalletsPage() {
     const vendor = vendorById[tx.vendor_id] || null;
     return {
       id: tx.id,
-      amount: Math.abs(Number(tx.amount || 0)),
+      // What the STUDENT gets back — order total minus the service charge
+      // (the platform's own fee, never refunded). Not the same as tx.amount,
+      // which is the vendor's held-balance clawback (their earnings share
+      // only) and is a smaller, different number.
+      amount: order ? Number(order.total || 0) - Number(order.service_charge || 0) : Math.abs(Number(tx.amount || 0)),
       createdAt: tx.created_at,
       orderId: tx.source_id,
       orderTotal: order?.total ?? null,

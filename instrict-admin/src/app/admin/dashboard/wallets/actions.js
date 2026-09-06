@@ -241,3 +241,34 @@ export async function rejectRiderWithdrawal(requestId, reason) {
   revalidatePath(WALLETS_PATH);
   return { success: true };
 }
+
+// ---------- Order refunds ----------
+
+// The button in the admin UI calls this once the vendor has actually
+// been paid back / student refunded manually outside the app (no in-app
+// student wallet). This directly flips payment_status to 'refunded' —
+// that value itself IS the "done" marker; there's no separate
+// in-between state.
+export async function markOrderRefundCompleted(orderId) {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  const { data: order, error: fetchErr } = await supabase
+    .from('orders')
+    .select('id, payment_status')
+    .eq('id', orderId)
+    .single();
+  if (fetchErr || !order) return { error: fetchErr?.message || 'Order not found.' };
+  if (order.payment_status === 'refunded') {
+    return { error: 'This order has already been marked as refunded.' };
+  }
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ payment_status: 'refunded' })
+    .eq('id', orderId);
+  if (error) return { error: error.message };
+
+  revalidatePath(WALLETS_PATH);
+  return { success: true };
+}

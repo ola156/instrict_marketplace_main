@@ -16,6 +16,11 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 
+
+import * as Sentry from "@sentry/nextjs";
+
+Sentry.setTag("portal", "student");
+
 const navTabs = [
   { name: 'Home',      href: '/home',      icon: Home },
   { name: 'Community', href: '/community', icon: Rss },

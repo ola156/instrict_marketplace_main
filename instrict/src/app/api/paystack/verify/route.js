@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { verifyTransaction } from '@/lib/paystack';
 import { createOrderFromMetadata } from '@/lib/create-order-from-metadata';
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 
 export async function GET(req) {
   const supabase = await createClient();
@@ -30,6 +31,10 @@ export async function GET(req) {
     return NextResponse.json({ success: true, orderId: order.id });
   } catch (err) {
     console.error('verify error:', err);
+    Sentry.captureException(err, {
+      tags: { flow: 'checkout', step: 'verify-fallback' },
+      extra: { reference },
+    });
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }

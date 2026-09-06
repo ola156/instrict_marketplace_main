@@ -7,6 +7,7 @@ import {
   rejectVendorWithdrawal,
   markRiderWithdrawalPaid,
   rejectRiderWithdrawal,
+  markOrderRefundCompleted,
 } from './actions';
 
 function StatCard({ label, value, sub, icon: Icon, tone }) {
@@ -152,8 +153,24 @@ function RequestRow({ request, name, onApprove, onReject }) {
 // One cancellation-refund entry — vendor's held balance was reversed, and
 // the actual money-back-to-student's-card step is manual (no in-app
 // student wallet), so payment_status = 'refunded' is the flag telling
-// admin that step still needs doing outside the app.
-function RefundRow({ refund }) {
+// admin that step still needs doing outside the app. refund_completed_at
+// is the separate marker for "I actually sent the money" — it can't reuse
+// payment_status since the orders_payment_status_check constraint only
+// allows unpaid/paid/refunded, with no fourth state for "done".
+function RefundRow({ refund, onMarkCompleted }) {
+  const [isPending, startTransition] = useTransition();
+  const [rowError, setRowError] = useState('');
+
+  const handleMarkCompleted = () => {
+    setRowError('');
+    startTransition(async () => {
+      const res = await onMarkCompleted();
+      if (res?.error) setRowError(res.error);
+    });
+  };
+
+  const isRefunded = refund.paymentStatus === 'refunded';
+
   return (
     <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -182,17 +199,35 @@ function RefundRow({ refund }) {
         </p>
       )}
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2">
         <span
           className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
-            refund.paymentStatus === 'refunded'
-              ? 'bg-amber-950/40 text-amber-400 border border-amber-900'
-              : 'bg-slate-800/60 text-slate-400 border border-slate-700'
+            isRefunded
+              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900'
+              : 'bg-amber-950/40 text-amber-400 border border-amber-900'
           }`}
         >
-          {refund.paymentStatus === 'refunded' ? 'Awaiting manual refund to student' : refund.paymentStatus || 'Unknown'}
+          {isRefunded ? 'Refunded' : 'Awaiting manual refund to student'}
         </span>
+
+        {!isRefunded && (
+          <button
+            onClick={handleMarkCompleted}
+            disabled={isPending}
+            className="px-2.5 py-1 rounded-md bg-emerald-900/50 hover:bg-emerald-900 disabled:opacity-50 text-emerald-300 text-[10px] font-bold uppercase tracking-wide"
+            title="Mark this refund as paid to the student"
+          >
+            Mark refunded
+          </button>
+        )}
       </div>
+
+      {rowError && (
+        <div className="flex items-start gap-1.5 rounded-md border border-rose-900/60 bg-rose-950/30 px-2.5 py-2">
+          <AlertTriangle size={12} className="text-rose-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-mono text-rose-300">{rowError}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -215,9 +250,16 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
     return res;
   }
 
+  async function handleMarkRefundCompleted(orderId) {
+    const res = await markOrderRefundCompleted(orderId);
+    if (!res?.error) window.location.reload();
+    return res;
+  }
+
   const totalOwedVendors = vendorWallets.reduce((s, v) => s + Number(v.balance || 0), 0);
   const totalOwedRiders = riderWallets.reduce((s, r) => s + Number(r.balance || 0), 0);
   const totalRefunded = refunds.reduce((s, r) => s + r.amount, 0);
+  const totalRefundsPending = refunds.filter((r) => r.paymentStatus !== 'refunded').length;
 
   return (
     <div className="space-y-4">
@@ -327,7 +369,7 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
         />
         <StatCard
           label="Refunds Pending Action"
-          value={refunds.filter((r) => r.paymentStatus === 'refunded').length}
+          value={totalRefundsPending}
           sub="Students still owed a manual refund"
           icon={Clock}
           tone="amber"
@@ -444,7 +486,11 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
             </h3>
             <div className="space-y-2">
               {refunds.map((r) => (
-                <RefundRow key={r.id} refund={r} />
+                <RefundRow
+                  key={r.id}
+                  refund={r}
+                  onMarkCompleted={() => handleMarkRefundCompleted(r.orderId)}
+                />
               ))}
               {refunds.length === 0 && <p className="text-xs text-slate-600 py-2">No refunds yet.</p>}
             </div>

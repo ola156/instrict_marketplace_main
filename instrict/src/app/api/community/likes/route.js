@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { sendPushToTokens } from '@/lib/sendPush';
+import * as Sentry from '@sentry/nextjs';
 
 const PROFILE_TABLE = {
   student: 'student_profiles',
@@ -10,40 +11,56 @@ const PROFILE_TABLE = {
 };
 
 export async function POST(req) {
-  const { postId, likerType } = await req.json();
+  try {
+    const { postId, likerType } = await req.json();
 
-  if (!postId || !likerType) {
-    return NextResponse.json({ error: 'Missing postId or likerType' }, { status: 400 });
+    if (!postId || !likerType) {
+      return NextResponse.json({ error: 'Missing postId or likerType' }, { status: 400 });
+    }
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // toggle_post_like is SECURITY DEFINER and already handles the
+    // notifications row insert for a new like (added in the earlier
+    // migration) — this route only adds the push on top of that.
+    const { data: likes, error } = await supabase.rpc('toggle_post_like', {
+      post_id: postId,
+      liker_type: likerType,
+    });
+
+    if (error) {
+      console.error('[likes] toggle error:', error);
+      Sentry.captureException(error, {
+        tags: { flow: 'community-like', step: 'toggle' },
+        extra: { postId, likerType },
+      });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // A toggle either adds or removes — if the caller's id is present in the
+    // result, this call just added it (it can't have been there before a
+    // toggle that just ran). Only push on add, never on unlike.
+    const justLiked = Array.isArray(likes) && likes.some((l) => l.id === user.id);
+    if (justLiked) {
+      notifyPostAuthorOfLike(postId, user.id).catch((err) => {
+        console.error('[push] like notify error:', err);
+        Sentry.captureException(err, {
+          tags: { flow: 'community-like', step: 'notify-author' },
+          extra: { postId },
+        });
+      });
+    }
+
+    return NextResponse.json({ likes });
+  } catch (err) {
+    console.error('community like route error:', err);
+    Sentry.captureException(err, {
+      tags: { flow: 'community-like', step: 'unhandled' },
+    });
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
   }
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  // toggle_post_like is SECURITY DEFINER and already handles the
-  // notifications row insert for a new like (added in the earlier
-  // migration) — this route only adds the push on top of that.
-  const { data: likes, error } = await supabase.rpc('toggle_post_like', {
-    post_id: postId,
-    liker_type: likerType,
-  });
-
-  if (error) {
-    console.error('[likes] toggle error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // A toggle either adds or removes — if the caller's id is present in the
-  // result, this call just added it (it can't have been there before a
-  // toggle that just ran). Only push on add, never on unlike.
-  const justLiked = Array.isArray(likes) && likes.some((l) => l.id === user.id);
-  if (justLiked) {
-    notifyPostAuthorOfLike(postId, user.id).catch((err) =>
-      console.error('[push] like notify error:', err)
-    );
-  }
-
-  return NextResponse.json({ likes });
 }
 
 async function notifyPostAuthorOfLike(postId, likerId) {

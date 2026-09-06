@@ -3,6 +3,7 @@ import { verifyTransaction } from '@/lib/paystack';
 import { notifyRidersOfNewJob } from '@/lib/notifyRiders';
 import { notifyAdminsOfActivity } from '@/lib/notifyAdmins';
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 
 export async function GET(req) {
   const supabase = await createClient();
@@ -43,18 +44,34 @@ export async function GET(req) {
         notifyRidersOfNewJob(supabase, {
           title: 'New errand available',
           body: 'A new errand is up for grabs — open the app to claim it.',
-        }).catch((err) => console.error('[push] rider notify error:', err));
+        }).catch((err) => {
+          console.error('[push] rider notify error:', err);
+          Sentry.captureException(err, {
+            tags: { flow: 'errand-verify', step: 'notify-riders' },
+            extra: { errandId: errand.id },
+          });
+        });
 
         notifyAdminsOfActivity(supabase, {
           title: 'New errand posted',
           body: 'A student just posted a new errand.',
-        }).catch((err) => console.error('[push] admin notify error:', err));
+        }).catch((err) => {
+          console.error('[push] admin notify error:', err);
+          Sentry.captureException(err, {
+            tags: { flow: 'errand-verify', step: 'notify-admins' },
+            extra: { errandId: errand.id },
+          });
+        });
       }
     }
 
     return NextResponse.json({ success: paid, errandId: errand.id });
   } catch (err) {
     console.error('errand verify error:', err);
+    Sentry.captureException(err, {
+      tags: { flow: 'errand-verify', step: 'verify' },
+      extra: { reference },
+    });
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }

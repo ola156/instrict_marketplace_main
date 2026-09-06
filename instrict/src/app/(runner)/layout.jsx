@@ -6,6 +6,11 @@ import RunnerVerificationBanner from './components/RunnerVerificationBanner';
 import RunnerMainContent from './components/RunnerMainContent';
 import RunnerHelpButton from './components/RunnerHelpButton';
 
+
+import * as Sentry from "@sentry/nextjs";
+
+Sentry.setTag("portal", "rider");
+
 export default function RunnerLayout({ children }) {
   return (
     <RunnerProvider>
