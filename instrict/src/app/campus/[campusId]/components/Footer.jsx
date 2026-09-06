@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Bike, Store, User, Mail } from "lucide-react";
+import { Bike, Store, User, Mail, Phone } from "lucide-react";
 
 export function LandingFooter() {
   return (
@@ -27,6 +27,14 @@ export function LandingFooter() {
               <Mail className="w-3 h-3" />
               instrictmarketplace@gmail.com
             </a>
+                  <a       
+                   href="tel:+2348032810928"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <Phone className="w-3 h-3" />
+              +234 803 281 0928
+            </a>
+
           </div>
 
           {/* Column: Join Us */}
