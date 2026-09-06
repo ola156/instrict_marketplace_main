@@ -17,6 +17,7 @@ export default function VendorAuthForm() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [formData, setFormData] = useState({
     businessName: '',
     email: '',
@@ -46,6 +47,12 @@ export default function VendorAuthForm() {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
+
+    if (authMode === 'signup' && !agreeToTerms) {
+      setError('You need to agree to the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -72,6 +79,7 @@ export default function VendorAuthForm() {
               business_name: formData.businessName,
               campus: campus,
               pending_role: 'vendor', // used after email confirm to know which role to attach
+              agreed_to_terms_at: new Date().toISOString(),
             },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
@@ -143,6 +151,12 @@ export default function VendorAuthForm() {
 
  const handleGoogleLogin = async () => {
   setError('');
+
+  if (authMode === 'signup' && !agreeToTerms) {
+    setError('You need to agree to the Terms of Service and Privacy Policy to continue.');
+    return;
+  }
+
   setIsLoading(true);
 
   // Store role/campus in cookies so they survive the Google redirect round-trip
@@ -318,6 +332,40 @@ export default function VendorAuthForm() {
                   />
                 </div>
               </div>
+            )}
+
+            {/* TERMS & PRIVACY AGREEMENT — signup only */}
+            {authMode === 'signup' && (
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreeToTerms}
+                  onChange={(e) => setAgreeToTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  I agree to the{' '}
+                  <a
+                    href="/Instrict_Terms_of_Service.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-bold text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                  >
+                    Terms of Service
+                  </a>
+                  {' '}and{' '}
+                  <a
+                    href="/Instrict_Privacy_Policy.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-bold text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                  >
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
             )}
 
             {error && (

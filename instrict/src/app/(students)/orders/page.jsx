@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShoppingBag, Clock, CheckCircle2, XCircle, Truck, Store, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle2, XCircle, Truck, Store, ChevronRight, LifeBuoy } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +31,10 @@ const doneStatuses    = ['picked_up','delivered','cancelled'];
 function OrderCard({ order, isNew, onOpen }) {
   const cfg = statusConfig[order.status] || statusConfig.pending;
   const Icon = cfg.icon;
+  const isCancelled = order.status === 'cancelled';
+  // Refund is owed once a paid order is cancelled — refunds are manual via
+  // support, so this is just a visibility flag, not a live payment state.
+  const refundOwed = isCancelled && order.payment_status === 'paid';
 
   return (
     <button
@@ -60,6 +64,21 @@ function OrderCard({ order, isNew, onOpen }) {
           <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
         </div>
       </div>
+
+      {isCancelled && (order.cancellation_reason || refundOwed) && (
+        <div className="px-4 pb-3.5 -mt-1 space-y-1.5">
+          {order.cancellation_reason && (
+            <p className="text-[10px] text-slate-400 truncate">
+              Reason: {order.cancellation_reason}
+            </p>
+          )}
+          {refundOwed && (
+            <p className="flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+              <LifeBuoy className="w-3 h-3" /> Refund pending — use the support icon
+            </p>
+          )}
+        </div>
+      )}
     </button>
   );
 }
@@ -98,7 +117,8 @@ function OrdersContent() {
     let query = supabase
       .from('orders')
       .select(`
-        id, status, fulfillment_type, delivery_hostel, total, note, created_at, payment_status
+        id, status, fulfillment_type, delivery_hostel, total, note, created_at, payment_status,
+        cancellation_reason, cancelled_by, cancelled_at
       `)
       .order('created_at', { ascending: false });
 

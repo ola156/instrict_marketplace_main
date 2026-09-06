@@ -16,6 +16,7 @@ const studentAuthSchema = z.object({
   fullName: z.string().optional(),
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().optional(),
+    agreeToTerms: z.boolean(),
 }).superRefine((data, ctx) => {
   if (data.mode === 'signup') {
     if (!data.fullName || data.fullName.trim().length < 3) {
@@ -30,6 +31,13 @@ const studentAuthSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: "Password must be at least 6 characters",
         path: ["password"],
+      });
+    }
+    if (!data.agreeToTerms) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "You need to agree to the Terms of Service and Privacy Policy to continue",
+        path: ["agreeToTerms"],
       });
     }
   }
@@ -61,7 +69,8 @@ export default function StudentAuth() {
       mode: 'login',
       email: '',
       fullName: '',
-      password: ''
+      password: '',
+       agreeToTerms: false,
     }
   });
 
@@ -100,6 +109,7 @@ export default function StudentAuth() {
             full_name: data.fullName,
             campus: campus,
             pending_role: 'user',
+             agreed_to_terms_at: new Date().toISOString(),
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -216,7 +226,7 @@ export default function StudentAuth() {
           </button>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-black tracking-tight">
+            <h2 className="text-md font-black tracking-tight">
               {authMode === 'login' && 'Welcome back'}
               {authMode === 'signup' && 'Create your profile'}
               {authMode === 'forgot' && 'Reset access password'}
@@ -328,6 +338,46 @@ export default function StudentAuth() {
                     {errors.password && <p className="text-[11px] font-bold text-rose-500 mt-0.5">{errors.password.message}</p>}
                   </div>
                 )}
+
+ {/* TERMS & PRIVACY AGREEMENT — signup only */}
+                {authMode === 'signup' && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input
+                        {...register('agreeToTerms')}
+                        type="checkbox"
+                        className={`mt-0.5 h-4 w-4 shrink-0 rounded-md border bg-white dark:bg-slate-900 text-blue-600 focus:ring-2 focus:ring-blue-600/20 focus:ring-offset-0 cursor-pointer ${
+                          errors.agreeToTerms ? 'border-rose-500' : 'border-slate-300 dark:border-slate-700'
+                        }`}
+                      />
+                      <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        I agree to the{' '}
+                        <a
+                          href="/Instrict_Terms_of_Service.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-bold  text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                        >
+                          Terms of Service
+                        </a>
+                        {' '}and{' '}
+                        <a
+                          href="/Instrict_Privacy_Policy.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-bold text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                        >
+                          Privacy Policy
+                        </a>
+                      </span>
+                    </label>
+                    {errors.agreeToTerms && <p className="text-[11px] font-bold text-rose-500 mt-0.5">{errors.agreeToTerms.message}</p>}
+                  </div>
+                )}
+
+
 
                 {serverError && (
                   <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/20 rounded-xl px-4 py-3">

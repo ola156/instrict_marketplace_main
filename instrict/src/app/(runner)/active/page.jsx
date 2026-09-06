@@ -9,6 +9,14 @@
 // but calls complete_errand() instead of confirm_delivery() — that RPC
 // is the only thing that can ever read the real code (it lives in a
 // separate errand_codes table the rider's session has no access to).
+//
+// Cancellation: routed through /api/rider/release-job (server-side,
+// since it also fires the rider push notification). Orders can only be
+// cancelled while 'ready' — once picked up, the rider has the goods, so
+// that has to go through support. Errands have no separate "picked up"
+// state, so they're cancellable any time before the dropoff code is
+// confirmed. Keep the allowed states here in sync with RELEASABLE in
+// app/api/rider/release-job/route.js.
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,7 +24,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useRunner } from '../context/RunnerProvider';
 import OtpInput from '@/components/otp/OtpInput';
 import {
-  MapPin, Phone, Package, CheckCircle2, Loader2, ArrowLeft, ShieldCheck, Clock, Bike,
+  MapPin, Phone, Package, CheckCircle2, Loader2, ArrowLeft, ShieldCheck, Clock, Bike, Ban,
 } from 'lucide-react';
 
 export default function RunnerActiveDelivery() {
@@ -31,11 +39,15 @@ export default function RunnerActiveDelivery() {
   const [orderActionLoading, setOrderActionLoading] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [delivered, setDelivered] = useState(false);
+  const [orderCancelled, setOrderCancelled] = useState(false);
+  const [showOrderCancelConfirm, setShowOrderCancelConfirm] = useState(false);
   const [codeDigits, setCodeDigits] = useState(['', '', '', '']);
 
   const [errandActionLoading, setErrandActionLoading] = useState(false);
   const [errandError, setErrandError] = useState('');
   const [errandCompleted, setErrandCompleted] = useState(false);
+  const [errandCancelled, setErrandCancelled] = useState(false);
+  const [showErrandCancelConfirm, setShowErrandCancelConfirm] = useState(false);
   const [errandCodeDigits, setErrandCodeDigits] = useState(['', '', '', '']);
 
   const fetchActiveOrder = async () => {
@@ -119,16 +131,18 @@ export default function RunnerActiveDelivery() {
     return () => { supabase.removeChannel(channel); };
   }, [runner, order?.id, supabase]);
 
-  // Once every active job this rider has is finished, bounce back to
-  // the job pool — but only after both (if there were two) are done.
+  // Once every active job this rider has is finished (delivered/completed
+  // OR cancelled), bounce back to the job pool — but only after both (if
+  // there were two) are resolved.
   useEffect(() => {
-    const orderDone = !order || delivered;
-    const errandDone = !errand || errandCompleted;
-    if ((delivered || errandCompleted) && orderDone && errandDone) {
+    const orderDone = !order || delivered || orderCancelled;
+    const errandDone = !errand || errandCompleted || errandCancelled;
+    const anyJustFinished = delivered || errandCompleted || orderCancelled || errandCancelled;
+    if (anyJustFinished && orderDone && errandDone) {
       const t = setTimeout(() => router.push('/jobs'), 1800);
       return () => clearTimeout(t);
     }
-  }, [delivered, errandCompleted]);
+  }, [delivered, errandCompleted, orderCancelled, errandCancelled]);
 
   const markPickedUp = async () => {
     if (!order) return;
@@ -203,6 +217,54 @@ export default function RunnerActiveDelivery() {
     setErrandCompleted(true);
   };
 
+  const cancelOrder = async () => {
+    if (!order) return;
+    setOrderActionLoading(true);
+    setOrderError('');
+    try {
+      const res = await fetch('/api/rider/release-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'order', id: order.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setOrderError(body.error || 'Could not cancel this delivery.');
+        return;
+      }
+      setOrderCancelled(true);
+    } catch {
+      setOrderError('Could not cancel this delivery. Check your connection and try again.');
+    } finally {
+      setOrderActionLoading(false);
+      setShowOrderCancelConfirm(false);
+    }
+  };
+
+  const cancelErrand = async () => {
+    if (!errand) return;
+    setErrandActionLoading(true);
+    setErrandError('');
+    try {
+      const res = await fetch('/api/rider/release-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'errand', id: errand.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setErrandError(body.error || 'Could not cancel this errand.');
+        return;
+      }
+      setErrandCancelled(true);
+    } catch {
+      setErrandError('Could not cancel this errand. Check your connection and try again.');
+    } finally {
+      setErrandActionLoading(false);
+      setShowErrandCancelConfirm(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
@@ -263,7 +325,13 @@ export default function RunnerActiveDelivery() {
               </div>
             )}
 
-            {delivered ? (
+            {orderCancelled ? (
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5 text-center space-y-2">
+                <Ban className="w-6 h-6 text-rose-500 mx-auto" />
+                <p className="text-xs font-black text-rose-600 dark:text-rose-400">Delivery cancelled</p>
+                <p className="text-[11px] text-slate-400">This job's been sent back to the pool for another rider.</p>
+              </div>
+            ) : delivered ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 text-center space-y-2">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
                 <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">Delivered!</p>
@@ -317,6 +385,42 @@ export default function RunnerActiveDelivery() {
                       >
                         {orderActionLoading ? 'Updating...' : "I've picked up the order"}
                       </button>
+                    )}
+
+                    {/* Cancel is only offered pre-pickup — once picked up, the
+                        rider has the goods and this needs to go through support. */}
+                    {isReadyForPickup && !showOrderCancelConfirm && (
+                      <button
+                        onClick={() => setShowOrderCancelConfirm(true)}
+                        disabled={orderActionLoading}
+                        className="w-full h-9 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/5 disabled:opacity-50 font-black text-[11px] tracking-tight transition-all"
+                      >
+                        Cancel this delivery
+                      </button>
+                    )}
+
+                    {isReadyForPickup && showOrderCancelConfirm && (
+                      <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 space-y-2">
+                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                          Cancel and send this back to the pool for another rider?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowOrderCancelConfirm(false)}
+                            disabled={orderActionLoading}
+                            className="flex-1 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-[11px] tracking-tight transition-all"
+                          >
+                            Keep job
+                          </button>
+                          <button
+                            onClick={cancelOrder}
+                            disabled={orderActionLoading}
+                            className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-[11px] tracking-tight transition-all"
+                          >
+                            {orderActionLoading ? 'Cancelling...' : 'Yes, cancel'}
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -391,7 +495,13 @@ export default function RunnerActiveDelivery() {
               </div>
             )}
 
-            {errandCompleted ? (
+            {errandCancelled ? (
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5 text-center space-y-2">
+                <Ban className="w-6 h-6 text-rose-500 mx-auto" />
+                <p className="text-xs font-black text-rose-600 dark:text-rose-400">Errand cancelled</p>
+                <p className="text-[11px] text-slate-400">This errand's been sent back to the pool for another rider.</p>
+              </div>
+            ) : errandCompleted ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 text-center space-y-2">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
                 <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">Errand completed!</p>
@@ -429,6 +539,42 @@ export default function RunnerActiveDelivery() {
                       <span className="font-medium">To:</span> {errand.dropoff_location}
                     </div>
                   </div>
+
+                  {/* Errands have no "picked up" step, so cancel stays available
+                      any time before the dropoff code is confirmed. */}
+                  {!showErrandCancelConfirm && (
+                    <button
+                      onClick={() => setShowErrandCancelConfirm(true)}
+                      disabled={errandActionLoading}
+                      className="w-full h-9 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/5 disabled:opacity-50 font-black text-[11px] tracking-tight transition-all"
+                    >
+                      Cancel this errand
+                    </button>
+                  )}
+
+                  {showErrandCancelConfirm && (
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                        Cancel and send this back to the pool for another rider?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowErrandCancelConfirm(false)}
+                          disabled={errandActionLoading}
+                          className="flex-1 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-[11px] tracking-tight transition-all"
+                        >
+                          Keep job
+                        </button>
+                        <button
+                          onClick={cancelErrand}
+                          disabled={errandActionLoading}
+                          className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-[11px] tracking-tight transition-all"
+                        >
+                          {errandActionLoading ? 'Cancelling...' : 'Yes, cancel'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">

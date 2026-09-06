@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import CancelOrderModal from '@/components/CancelOrderModal';
 import {
   Clock, CheckCircle2, ChefHat, Bell, Truck, Store, X, MapPin, Loader2, Phone,
 } from 'lucide-react';
@@ -45,6 +46,12 @@ function getAction(order) {
   }
 }
 
+// A vendor can only cancel while the order is still theirs to walk back —
+// once it's preparing/ready, food is being cooked or a rider may already
+// be involved, so cancellation stops being a vendor-only decision.
+// Keep this in sync with CANCELLABLE_FROM in /api/orders/update-status.
+const CANCELLABLE_FROM = ['pending', 'confirmed'];
+
 const toneClasses = {
   blue: 'bg-blue-600 hover:bg-blue-700',
   purple: 'bg-purple-600 hover:bg-purple-700',
@@ -55,20 +62,21 @@ function fmtTime(d) {
   return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function OrderCard({ order, onStatusChange, busy }) {
+function OrderCard({ order, onStatusChange, onRequestCancel, busy }) {
   const badge = statusBadge[order.status] || statusBadge.pending;
   const action = getAction(order);
   const isDelivery = order.fulfillment_type === 'delivery';
   const waitingOnRider = order.status === 'ready' && isDelivery;
   const isBusy = busy === order.id;
   const isTerminal = ['picked_up', 'delivered', 'cancelled'].includes(order.status);
+  const canCancel = CANCELLABLE_FROM.includes(order.status);
 
   // Pickup orders show the student's phone so the vendor can reach them
   // directly (e.g. when the order is ready, or to confirm details).
- const showStudentPhone = !isDelivery && !!order.student?.phone;
+  const showStudentPhone = !isDelivery && !!order.student?.phone;
 
   const handleAdvance = () => action?.next && onStatusChange(order.id, action.next);
-  const handleCancel = () => onStatusChange(order.id, 'cancelled');
+  const handleCancel = () => onRequestCancel(order);
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
@@ -114,22 +122,22 @@ function OrderCard({ order, onStatusChange, busy }) {
             <span className="truncate">{order.delivery_hostel || 'Hostel TBD'}</span>
           </span>
         )}
-       {showStudentPhone && (
-  <div className="flex items-center gap-2 shrink-0">
-    {order.student.full_name && (
-      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
-        {order.student.full_name}
-      </span>
-    )}
-    <a
-      href={`tel:${order.student.phone}`}
-      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400"
-    >
-      <Phone className="w-3 h-3 shrink-0" />
-      {order.student.phone}
-    </a>
-  </div>
-)}
+        {showStudentPhone && (
+          <div className="flex items-center gap-2 shrink-0">
+            {order.student.full_name && (
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
+                {order.student.full_name}
+              </span>
+            )}
+            <a
+              href={`tel:${order.student.phone}`}
+              className="flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400"
+            >
+              <Phone className="w-3 h-3 shrink-0" />
+              {order.student.phone}
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Items */}
@@ -162,6 +170,13 @@ function OrderCard({ order, onStatusChange, busy }) {
         </p>
       )}
 
+      {/* Cancellation reason, shown once cancelled */}
+      {order.status === 'cancelled' && order.cancellation_reason && (
+        <p className="text-[11px] text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 rounded-lg px-3 py-2">
+          Cancelled: {order.cancellation_reason}
+        </p>
+      )}
+
       {/* Action */}
       {action ? (
         <button
@@ -189,7 +204,7 @@ function OrderCard({ order, onStatusChange, busy }) {
         </div>
       ) : null}
 
-      {order.status === 'pending' && (
+      {canCancel && (
         <button
           onClick={handleCancel}
           disabled={isBusy}
@@ -208,6 +223,7 @@ export default function LiveKitchen({ vendorUserId }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed'
+  const [cancelTarget, setCancelTarget] = useState(null); // order currently being cancelled
 
   const terminalStatuses = ['picked_up', 'delivered', 'cancelled'];
 
@@ -228,6 +244,7 @@ export default function LiveKitchen({ vendorUserId }) {
       .from('orders')
       .select(`
         id, status, subtotal, fulfillment_type, delivery_hostel, total, note, created_at, payment_status,
+        cancellation_reason, cancelled_by, cancelled_at,
         order_items (id, name, quantity, unit_price, selected_extras),
         student:student_profiles(full_name, phone)
       `)
@@ -241,26 +258,36 @@ export default function LiveKitchen({ vendorUserId }) {
 
   // Routed through the server so the rider-notification step (which needs
   // the Firebase Admin SDK — server-only, never exposed to the browser)
-  // can fire on the ready+delivery transition.
-  const handleStatusChange = async (orderId, newStatus) => {
+  // can fire on the ready+delivery transition, and so cancellation reason
+  // validation happens server-side too, not just in the UI.
+  const handleStatusChange = async (orderId, newStatus, reason) => {
     setBusy(orderId);
 
     try {
       const res = await fetch('/api/orders/update-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, newStatus }),
+        body: JSON.stringify({ orderId, newStatus, ...(reason ? { reason } : {}) }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         console.error('Failed to update order status:', data.error || res.statusText);
+        return { ok: false, error: data.error };
       }
+      return { ok: true };
     } catch (err) {
       console.error('Failed to update order status:', err);
+      return { ok: false, error: 'Network error' };
+    } finally {
+      await fetchOrders();
+      setBusy(null);
     }
+  };
 
-    await fetchOrders();
-    setBusy(null);
+  const handleConfirmCancel = async (orderId, reason) => {
+    const result = await handleStatusChange(orderId, 'cancelled', reason);
+    if (result.ok) setCancelTarget(null);
+    // on failure, leave the modal open so the vendor sees the error and can retry
   };
 
   const activeOrders = orders.filter((o) => !terminalStatuses.includes(o.status));
@@ -348,10 +375,23 @@ export default function LiveKitchen({ vendorUserId }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {displayedOrders.map(order => (
-            <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} busy={busy} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              onStatusChange={handleStatusChange}
+              onRequestCancel={setCancelTarget}
+              busy={busy}
+            />
           ))}
         </div>
       )}
+
+      <CancelOrderModal
+        order={cancelTarget}
+        onConfirm={handleConfirmCancel}
+        onClose={() => setCancelTarget(null)}
+        submitting={busy === cancelTarget?.id}
+      />
     </div>
   );
 }

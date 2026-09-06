@@ -9,14 +9,25 @@ const TIMESTAMP_FIELD = {
   cancelled: 'cancelled_at',
 };
 
+// A vendor can only cancel while the order is still theirs to walk back —
+// once it's preparing/ready, food is being cooked, a print job is running,
+// or a rider may already be involved, so cancellation stops being a
+// vendor-only decision. Keep this in sync with the CANCELLABLE_FROM
+// constants in LiveKitchen.jsx / RetailOrders.jsx / IncomingOrders.jsx.
+const CANCELLABLE_FROM = ['pending', 'confirmed'];
+
 export async function POST(req) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const { orderId, newStatus } = await req.json();
+  const { orderId, newStatus, reason } = await req.json();
   if (!orderId || !newStatus) {
     return NextResponse.json({ error: 'orderId and newStatus are required' }, { status: 400 });
+  }
+
+  if (newStatus === 'cancelled' && !reason?.trim()) {
+    return NextResponse.json({ error: 'A cancellation reason is required' }, { status: 400 });
   }
 
   // Confirm this order actually belongs to the requesting vendor before
@@ -37,9 +48,21 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Not your order' }, { status: 403 });
   }
 
+  if (newStatus === 'cancelled' && !CANCELLABLE_FROM.includes(order.status)) {
+    return NextResponse.json(
+      { error: `Cannot cancel an order that is already ${order.status}` },
+      { status: 409 }
+    );
+  }
+
   const update = { status: newStatus };
   const timestampField = TIMESTAMP_FIELD[newStatus];
   if (timestampField) update[timestampField] = new Date().toISOString();
+
+  if (newStatus === 'cancelled') {
+    update.cancellation_reason = reason.trim();
+    update.cancelled_by = 'vendor';
+  }
 
   const { error: updateError } = await supabase.from('orders').update(update).eq('id', orderId);
   if (updateError) {

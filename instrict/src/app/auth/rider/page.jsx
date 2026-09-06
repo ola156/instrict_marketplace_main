@@ -16,6 +16,7 @@ const riderAuthSchema = z.object({
   fullName: z.string().optional(),
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().optional(),
+  agreeToTerms: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.mode === 'signup') {
     if (!data.fullName || data.fullName.trim().length < 3) {
@@ -30,6 +31,13 @@ const riderAuthSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: "Password must be at least 6 characters",
         path: ["password"],
+      });
+    }
+    if (!data.agreeToTerms) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "You need to agree to the Terms of Service and Privacy Policy to continue",
+        path: ["agreeToTerms"],
       });
     }
   }
@@ -66,7 +74,8 @@ export default function RiderAuth() {
       mode: 'login',
       email: '',
       fullName: '',
-      password: ''
+      password: '',
+      agreeToTerms: false,
     }
   });
 
@@ -100,6 +109,7 @@ export default function RiderAuth() {
             full_name: data.fullName,
             campus: campus,
             pending_role: 'rider',
+            agreed_to_terms_at: new Date().toISOString(),
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -183,7 +193,7 @@ export default function RiderAuth() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
             <Bike className="w-3.5 h-3.5 text-blue-300" />
             <span className="text-[9px] font-black tracking-widest uppercase text-white/90">
-              LOGISTICS FORCE NODE
+              Runner Sign Up & Log In
             </span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black leading-[1.1] tracking-tight text-white">
@@ -196,7 +206,7 @@ export default function RiderAuth() {
         </div>
 
         <div className="relative z-10 text-[11px] text-white/40 font-medium">
-          &copy; Instrict Logistics — Unified Transit Infrastructure
+          &copy; Instrict Logistics
         </div>
       </section>
 
@@ -328,6 +338,44 @@ export default function RiderAuth() {
                       />
                     </div>
                     {errors.password && <p className="text-[11px] font-bold text-rose-500 mt-0.5">{errors.password.message}</p>}
+                  </div>
+                )}
+
+                {/* TERMS & PRIVACY AGREEMENT — signup only */}
+                {authMode === 'signup' && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input
+                        {...register('agreeToTerms')}
+                        type="checkbox"
+                        className={`mt-0.5 h-4 w-4 shrink-0 rounded-md border bg-white dark:bg-slate-900 text-blue-600 focus:ring-2 focus:ring-blue-600/20 focus:ring-offset-0 cursor-pointer ${
+                          errors.agreeToTerms ? 'border-rose-500' : 'border-slate-300 dark:border-slate-700'
+                        }`}
+                      />
+                      <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        I agree to the{' '}
+                        <a
+                          href="/Instrict_Terms_of_Service.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-bold text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                        >
+                          Terms of Service
+                        </a>
+                        {' '}and{' '}
+                        <a
+                          href="/Instrict_Privacy_Policy.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-bold text-slate-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                        >
+                          Privacy Policy
+                        </a>
+                      </span>
+                    </label>
+                    {errors.agreeToTerms && <p className="text-[11px] font-bold text-rose-500 mt-0.5">{errors.agreeToTerms.message}</p>}
                   </div>
                 )}
 

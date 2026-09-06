@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import {
   ChevronLeft, Clock, CheckCircle2, XCircle, Truck, Store,
-  FileText, Copy, Check, MapPin, Phone, Bike, ShoppingBag,
+  FileText, Copy, Check, MapPin, Phone, Bike, ShoppingBag, LifeBuoy, RefreshCcw,
 } from 'lucide-react';
 
 function cn(...c) { return c.filter(Boolean).join(' '); }
@@ -105,6 +105,16 @@ export default function OrderDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Rider-reassignment notice: shown the moment a rider who was assigned
+  // to this order drops off (rider_id goes from set -> null) while the
+  // order is still active. We track the *previous* rider_id ourselves —
+  // the query result alone can't distinguish "never had a rider yet"
+  // from "just lost one" — and only arm this after the first successful
+  // load, so mount doesn't false-fire it.
+  const [riderReassigning, setRiderReassigning] = useState(false);
+  const prevRiderIdRef = useRef(undefined); // undefined = not loaded yet
+  const reassignTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (!orderId) return;
     let active = true;
@@ -116,6 +126,7 @@ export default function OrderDetailPage() {
           id, status, fulfillment_type, delivery_address, delivery_hostel,
           subtotal, delivery_fee, service_charge, total,
           payment_status, note, created_at, dropoff_code, rider_id,
+          cancellation_reason, cancelled_by, cancelled_at,
           order_type, description, line_items, file_urls,
           vendor:vendor_id(legal_name, avatar_url, store_address, landmark, category, support_phone),
           rider:rider_id(full_name, phone),
@@ -127,9 +138,31 @@ export default function OrderDetailPage() {
       if (!active) return;
       if (error || !data) {
         setNotFound(true);
-      } else {
-        setOrder(data);
+        setLoading(false);
+        return;
       }
+
+      // Detect "had a rider, now doesn't" while the order is still active.
+      // Skip the very first load (prevRiderIdRef.current === undefined)
+      // so we never fire this just because the page mounted with no rider.
+      const isStillActive = activeStatuses.includes(data.status);
+      if (
+        prevRiderIdRef.current !== undefined &&
+        prevRiderIdRef.current &&
+        !data.rider_id &&
+        isStillActive
+      ) {
+        setRiderReassigning(true);
+        if (reassignTimeoutRef.current) clearTimeout(reassignTimeoutRef.current);
+        reassignTimeoutRef.current = setTimeout(() => setRiderReassigning(false), 8000);
+      } else if (data.rider_id) {
+        // A new rider showed up (or the same one) — clear any pending notice.
+        setRiderReassigning(false);
+        if (reassignTimeoutRef.current) clearTimeout(reassignTimeoutRef.current);
+      }
+      prevRiderIdRef.current = data.rider_id;
+
+      setOrder(data);
       setLoading(false);
     };
 
@@ -150,6 +183,7 @@ export default function OrderDetailPage() {
     return () => {
       active = false;
       supabase.removeChannel(channel);
+      if (reassignTimeoutRef.current) clearTimeout(reassignTimeoutRef.current);
     };
   }, [orderId]);
 
@@ -198,7 +232,13 @@ export default function OrderDetailPage() {
 
   const progressSteps = getProgressSteps(category, order.fulfillment_type);
   const stepIndex = progressSteps.findIndex((s) => s.key === order.status);
-  const showProgress = order.status !== 'cancelled';
+  const isCancelled = order.status === 'cancelled';
+  const showProgress = !isCancelled;
+
+  // A refund is owed once a paid order gets cancelled — refunds are handled
+  // manually by support (no auto-refund), so this only tells the student
+  // where to go, it doesn't trigger anything itself.
+  const refundOwed = isCancelled && order.payment_status === 'paid';
 
   const showRiderCard = order.fulfillment_type === 'delivery' && order.rider && !!order.rider_id;
 
@@ -245,8 +285,10 @@ export default function OrderDetailPage() {
         <div>
           <p className="text-sm font-black">{cfg.label}</p>
           <p className="text-[11px] opacity-80">
-            {order.status === 'cancelled'
-              ? 'This order was cancelled.'
+            {isCancelled
+              ? (order.cancellation_reason
+                  ? `Cancelled by the vendor: "${order.cancellation_reason}"`
+                  : 'This order was cancelled by the vendor.')
               : order.status === 'delivered' || (order.status === 'picked_up' && order.fulfillment_type === 'pickup')
               ? 'This order is complete.'
               : "We'll update this in real time as things change."}
@@ -254,8 +296,47 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Rider reassignment notice — fires the moment a previously-assigned
+          rider drops off while the order is still active. Auto-dismisses
+          after 8s, and clears immediately once a new rider picks it up. */}
+      {riderReassigning && (
+        <div className="bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-500/20 rounded-2xl p-4 mb-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+            <RefreshCcw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black text-slate-900 dark:text-white">
+              Finding you a new rider
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Your previous rider had to step away. Your order is back in the queue and we're assigning a new one now.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Refund guidance — only shown when the order was paid before it
+          was cancelled, since that's the only case money actually moved.
+          No button here: the floating support icon already on screen is
+          the single entry point, so this is just a pointer to it. */}
+      {refundOwed && (
+        <div className="bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-500/20 rounded-2xl p-4 mb-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center shrink-0">
+            <LifeBuoy className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black text-slate-900 dark:text-white">
+              You paid for this order
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Since it was cancelled after payment, tap the support icon to request your refund.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Dropoff code — shown once vendor marks ready for a delivery order */}
-      {order.fulfillment_type === 'delivery' && order.dropoff_code && order.status !== 'cancelled' && (
+      {order.fulfillment_type === 'delivery' && order.dropoff_code && !isCancelled && (
         <div className="relative rounded-2xl mb-4 overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -281,7 +362,7 @@ export default function OrderDetailPage() {
 
       {/* Estimated arrival — retail orders only, derived from
           menu_items.estimated_duration_minutes for the items ordered */}
-      {isRetail && estimatedArrivalDate && order.status !== 'cancelled' && (
+      {isRetail && estimatedArrivalDate && !isCancelled && (
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
             <Truck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -615,12 +696,14 @@ export default function OrderDetailPage() {
           <span className="text-[10px] text-slate-400 font-bold">Payment</span>
           <span
             className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
-              order.payment_status === 'paid'
+              order.payment_status === 'refunded'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                : order.payment_status === 'paid'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
             }`}
           >
-            {order.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
+            {order.payment_status === 'refunded' ? 'Refunded' : order.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
           </span>
         </div>
       </div>

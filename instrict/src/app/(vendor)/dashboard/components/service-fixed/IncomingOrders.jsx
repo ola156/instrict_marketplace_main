@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import CancelOrderModal from '@/components/CancelOrderModal';
 import {
   FileText, Download, CheckCircle2, Clock, Truck, Store,
   MapPin, ClipboardList, Loader2, User
@@ -23,16 +24,23 @@ function getNextAction(order) {
   }
 }
 
+// A vendor can only cancel while the order is still theirs to walk back —
+// once printing has started, the job's underway and shouldn't be pulled
+// without support involved. Keep this in sync with CANCELLABLE_FROM in
+// /api/orders/update-status.
+const CANCELLABLE_FROM = ['pending', 'confirmed'];
+
 function fmtDate(d) {
   return new Date(d).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function OrderCard({ order, onAdvance, busy }) {
+function OrderCard({ order, onAdvance, onRequestCancel, busy }) {
   const files = order.file_urls?.length ? order.file_urls : (order.file_url ? [order.file_url] : []);
   const specs = (order.line_items || []).flatMap((li) => li?.breakdown || []);
   const isDelivery = order.fulfillment_type === 'delivery';
   const isBusy = busy === order.id;
   const action = getNextAction(order);
+  const canCancel = CANCELLABLE_FROM.includes(order.status);
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-3">
@@ -71,31 +79,31 @@ function OrderCard({ order, onAdvance, busy }) {
         </span>
       </div>
 
-    {isDelivery && (
-  <div className="flex items-start gap-2 text-[11px] text-slate-400 px-1">
-    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-    <span>{order.delivery_hostel || order.delivery_address || 'Address on file'}</span>
-  </div>
-)}
+      {isDelivery && (
+        <div className="flex items-start gap-2 text-[11px] text-slate-400 px-1">
+          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>{order.delivery_hostel || order.delivery_address || 'Address on file'}</span>
+        </div>
+      )}
 
-{!isDelivery && order.student && (
-  <div className="flex items-center gap-2 text-[11px] text-slate-500 px-1">
-    <User className="w-3.5 h-3.5 shrink-0" />
-    <span className="font-bold text-slate-700 dark:text-slate-300 truncate">
-      {order.student.full_name}
-    </span>
-    {order.student.phone && (
-      <a
-        href={`tel:${order.student.phone}`}
-        className="ml-auto text-blue-500 dark:text-blue-400 font-black shrink-0"
-      >
-        {order.student.phone}
-      </a>
-    )}
-  </div>
-)}
+      {!isDelivery && order.student && (
+        <div className="flex items-center gap-2 text-[11px] text-slate-500 px-1">
+          <User className="w-3.5 h-3.5 shrink-0" />
+          <span className="font-bold text-slate-700 dark:text-slate-300 truncate">
+            {order.student.full_name}
+          </span>
+          {order.student.phone && (
+            <a
+              href={`tel:${order.student.phone}`}
+              className="ml-auto text-blue-500 dark:text-blue-400 font-black shrink-0"
+            >
+              {order.student.phone}
+            </a>
+          )}
+        </div>
+      )}
 
-    {files.length > 0 && (
+      {files.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Files</p>
           <div className="flex flex-col gap-1.5">
@@ -151,6 +159,16 @@ function OrderCard({ order, onAdvance, busy }) {
         </div>
       )}
 
+      {/* Cancellation reason, shown once cancelled */}
+      {order.status === 'cancelled' && order.cancellation_reason && (
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-rose-400 mb-1">Cancellation reason</p>
+          <p className="text-[11px] text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 rounded-lg px-3 py-2">
+            {order.cancellation_reason}
+          </p>
+        </div>
+      )}
+
       {action && (
         <button
           onClick={() => onAdvance(order.id, action.next)}
@@ -189,6 +207,16 @@ function OrderCard({ order, onAdvance, busy }) {
           Cancelled
         </div>
       )}
+
+      {canCancel && (
+        <button
+          onClick={() => onRequestCancel(order)}
+          disabled={isBusy}
+          className="w-full h-8 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all flex items-center justify-center gap-1.5 text-[10px] font-bold disabled:opacity-50"
+        >
+          Cancel order
+        </button>
+      )}
     </div>
   );
 }
@@ -199,6 +227,7 @@ export default function IncomingOrders({ vendorUserId }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed'
+  const [cancelTarget, setCancelTarget] = useState(null); // order currently being cancelled
 
   const terminalStatuses = ['picked_up', 'delivered', 'cancelled'];
 
@@ -231,7 +260,8 @@ export default function IncomingOrders({ vendorUserId }) {
         subtotal, delivery_fee, service_charge, total, payment_status,
         note, description, line_items, file_urls, file_url,
         created_at, ready_at, accepted_at, picked_up_at,
-         student:student_profiles(full_name, phone)
+        cancellation_reason, cancelled_by, cancelled_at,
+        student:student_profiles(full_name, phone)
       `)
       .eq('vendor_id', vendorUserId)
       .eq('order_type', 'print')
@@ -242,26 +272,36 @@ export default function IncomingOrders({ vendorUserId }) {
   };
 
   // Routed through the server so the rider-notification step (needs the
-  // Firebase Admin SDK, server-only) can fire on ready+delivery.
-  const advanceStatus = async (orderId, newStatus) => {
+  // Firebase Admin SDK, server-only) can fire on ready+delivery, and so
+  // cancellation reason validation happens server-side too.
+  const advanceStatus = async (orderId, newStatus, reason) => {
     setBusy(orderId);
 
     try {
       const res = await fetch('/api/orders/update-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, newStatus }),
+        body: JSON.stringify({ orderId, newStatus, ...(reason ? { reason } : {}) }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         console.error('Failed to update order status:', data.error || res.statusText);
+        return { ok: false, error: data.error };
       }
+      return { ok: true };
     } catch (err) {
       console.error('Failed to update order status:', err);
+      return { ok: false, error: 'Network error' };
+    } finally {
+      await fetchOrders();
+      setBusy(null);
     }
+  };
 
-    await fetchOrders();
-    setBusy(null);
+  const handleConfirmCancel = async (orderId, reason) => {
+    const result = await advanceStatus(orderId, 'cancelled', reason);
+    if (result.ok) setCancelTarget(null);
+    // on failure, leave the modal open so the vendor sees the error and can retry
   };
 
   const activeOrders = orders.filter((o) => !terminalStatuses.includes(o.status));
@@ -341,10 +381,23 @@ export default function IncomingOrders({ vendorUserId }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {displayedOrders.map((order) => (
-            <OrderCard key={order.id} order={order} onAdvance={advanceStatus} busy={busy} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              onAdvance={advanceStatus}
+              onRequestCancel={setCancelTarget}
+              busy={busy}
+            />
           ))}
         </div>
       )}
+
+      <CancelOrderModal
+        order={cancelTarget}
+        onConfirm={handleConfirmCancel}
+        onClose={() => setCancelTarget(null)}
+        submitting={busy === cancelTarget?.id}
+      />
     </div>
   );
 }
