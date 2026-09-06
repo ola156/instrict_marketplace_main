@@ -61,7 +61,7 @@ export default function HeroSection() {
 
           {/* Welcome Headline */}
           <h1 className="text-5xl sm:text-5xl md:text-6xl capitalize font-black tracking-[-0.05em] leading-[0.85] text-slate-950 dark:text-white max-w-4xl animate-[slideUp_0.8s_cubic-bezier(0.16,1,0.3,1)_0.1s_both]">
-            Welcome to your <span className='uppercase'>{campus ? ` ${campus} ` : ' '}</span> <br />
+            Welcome to <span className='uppercase'>{campus ? ` ${campus} ` : ' '}</span> <br />
             <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-slate-400 bg-clip-text text-transparent dark:from-blue-400 dark:via-indigo-300 dark:to-slate-700">
               campus Ecosystem.
             </span>
