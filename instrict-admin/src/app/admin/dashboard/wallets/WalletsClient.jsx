@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Wallet, TrendingUp, Truck, Store, Check, X, Clock, AlertTriangle, Bike, ShoppingBag, Layers, Percent } from 'lucide-react';
+import { Wallet, TrendingUp, Truck, Store, Check, X, Clock, AlertTriangle, Bike, ShoppingBag, Layers, Percent, Undo2 } from 'lucide-react';
 import {
   markVendorWithdrawalPaid,
   rejectVendorWithdrawal,
@@ -16,6 +16,7 @@ function StatCard({ label, value, sub, icon: Icon, tone }) {
     amber: 'bg-amber-950/40 text-amber-400 border-amber-900',
     slate: 'bg-slate-800/40 text-slate-300 border-slate-700',
     purple: 'bg-purple-950/40 text-purple-400 border-purple-900',
+    rose: 'bg-rose-950/40 text-rose-400 border-rose-900',
   };
   return (
     <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
@@ -148,7 +149,55 @@ function RequestRow({ request, name, onApprove, onReject }) {
   );
 }
 
-export default function WalletsClient({ vendorWallets, riderWallets, vendorRequests, riderRequests, revenue }) {
+// One cancellation-refund entry — vendor's held balance was reversed, and
+// the actual money-back-to-student's-card step is manual (no in-app
+// student wallet), so payment_status = 'refunded' is the flag telling
+// admin that step still needs doing outside the app.
+function RefundRow({ refund }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/40 p-3 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-slate-200">
+            <span className="font-bold">{refund.vendorName}</span>
+            <span className="text-slate-500"> → </span>
+            <span className="font-bold">{refund.studentName}</span>
+          </p>
+          <p className="text-[10px] font-mono text-slate-500 mt-0.5">
+            Order #{refund.orderId ? refund.orderId.slice(0, 8).toUpperCase() : '—'} ·{' '}
+            {new Date(refund.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-sm font-mono font-bold text-rose-400">₦{refund.amount.toLocaleString()}</span>
+          <p className="text-[9px] font-black uppercase tracking-wide text-slate-500 mt-1">
+            {refund.cancelledBy ? `Cancelled by ${refund.cancelledBy}` : 'Cancelled'}
+          </p>
+        </div>
+      </div>
+
+      {refund.reason && (
+        <p className="text-[11px] font-mono text-slate-400 border-t border-slate-800 pt-2">
+          "{refund.reason}"
+        </p>
+      )}
+
+      <div className="flex items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+            refund.paymentStatus === 'refunded'
+              ? 'bg-amber-950/40 text-amber-400 border border-amber-900'
+              : 'bg-slate-800/60 text-slate-400 border border-slate-700'
+          }`}
+        >
+          {refund.paymentStatus === 'refunded' ? 'Awaiting manual refund to student' : refund.paymentStatus || 'Unknown'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function WalletsClient({ vendorWallets, riderWallets, vendorRequests, riderRequests, revenue, refunds = [] }) {
   const [tab, setTab] = useState('vendors');
 
   // Row actions now return their result to the row itself (for inline error
@@ -168,6 +217,7 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
 
   const totalOwedVendors = vendorWallets.reduce((s, v) => s + Number(v.balance || 0), 0);
   const totalOwedRiders = riderWallets.reduce((s, r) => s + Number(r.balance || 0), 0);
+  const totalRefunded = refunds.reduce((s, r) => s + r.amount, 0);
 
   return (
     <div className="space-y-4">
@@ -262,9 +312,31 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
   />
 </div>
 
+      {/* SECTION 4 — cancellation reversals: money that was HELD for a
+          vendor (never withdrawable) and got clawed back when a paid
+          order was cancelled. This is not cash the platform lost — it's
+          the flag for "student is now owed a manual refund". */}
+      <SectionLabel>Refunds From Cancelled Orders</SectionLabel>
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 px-4 pb-2">
+        <StatCard
+          label="Total Reversed From Vendors"
+          value={`₦${totalRefunded.toLocaleString()}`}
+          sub="Held earnings clawed back on post-payment cancellations"
+          icon={Undo2}
+          tone="rose"
+        />
+        <StatCard
+          label="Refunds Pending Action"
+          value={refunds.filter((r) => r.paymentStatus === 'refunded').length}
+          sub="Students still owed a manual refund"
+          icon={Clock}
+          tone="amber"
+        />
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-800 p-1">
-        {['vendors', 'riders'].map((t) => (
+        {['vendors', 'riders', 'refunds'].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -272,7 +344,7 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
               tab === t ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}
           >
-            {t === 'vendors' ? 'Vendors' : 'Riders'}
+            {t === 'vendors' ? 'Vendors' : t === 'riders' ? 'Riders' : `Refunds${refunds.length ? ` (${refunds.length})` : ''}`}
           </button>
         ))}
       </div>
@@ -309,6 +381,9 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
                     <span className="text-slate-500">earned ₦{Number(w.total_earned).toLocaleString()}</span>
                     {Number(w.pending_payout) > 0 && (
                       <span className="text-amber-400">pending ₦{Number(w.pending_payout).toLocaleString()}</span>
+                    )}
+                    {Number(w.held_balance) > 0 && (
+                      <span className="text-purple-400">held ₦{Number(w.held_balance).toLocaleString()}</span>
                     )}
                   </div>
                 </div>
@@ -356,6 +431,22 @@ export default function WalletsClient({ vendorWallets, riderWallets, vendorReque
                 </div>
               ))}
               {riderWallets.length === 0 && <p className="text-xs text-slate-600 py-2">No rider wallets yet.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'refunds' && (
+        <div className="space-y-4 p-4">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">
+              Cancellation reversals — held earnings clawed back from vendors
+            </h3>
+            <div className="space-y-2">
+              {refunds.map((r) => (
+                <RefundRow key={r.id} refund={r} />
+              ))}
+              {refunds.length === 0 && <p className="text-xs text-slate-600 py-2">No refunds yet.</p>}
             </div>
           </div>
         </div>

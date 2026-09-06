@@ -15,6 +15,7 @@ export default async function WalletsPage() {
     { data: completedErrands },
     { data: riderFeeTx },
     { data: vendorFeeTx },
+    { data: reversalTx },
   ] = await Promise.all([
     supabase
       .from('vendor_wallet')
@@ -53,6 +54,16 @@ export default async function WalletsPage() {
       .from('vendor_wallet_transactions')
       .select('gross_amount, platform_fee')
       .eq('type', 'order_earning'),
+    // Cancellation reversals — money that was held for a vendor but never
+    // reached their withdrawable balance, clawed back on a post-payment
+    // cancellation. source_id points at orders.id but isn't a real FK
+    // (source_id is a generic uuid covering both orders and errands), so
+    // it can't be nested in this select — fetched separately below.
+    supabase
+      .from('vendor_wallet_transactions')
+      .select('id, vendor_id, amount, source_id, description, created_at')
+      .eq('type', 'reversal')
+      .order('created_at', { ascending: false }),
   ]);
 
   // Student-side revenue (service charge added on top at checkout — 3%
@@ -114,6 +125,54 @@ export default async function WalletsPage() {
   // and riders, unlike platform_total above.
   revenue.total_income = revenue.total + revenue.errand_total_charged;
 
+  // ---------- Refunds (cancellation reversals) ----------
+  // Stitched together manually since source_id isn't a real FK: fetch the
+  // related orders + student names in two follow-up batch queries keyed
+  // off the ids we already have, then merge in JS.
+  const reversalRows = reversalTx || [];
+  const orderIds = [...new Set(reversalRows.map((tx) => tx.source_id).filter(Boolean))];
+  const vendorIds = [...new Set(reversalRows.map((tx) => tx.vendor_id).filter(Boolean))];
+
+  const [{ data: refundOrders }, { data: refundVendors }] = await Promise.all([
+    orderIds.length
+      ? supabase
+          .from('orders')
+          .select('id, student_id, total, payment_status, cancelled_by, cancellation_reason, cancelled_at')
+          .in('id', orderIds)
+      : Promise.resolve({ data: [] }),
+    vendorIds.length
+      ? supabase.from('vendor_profiles').select('user_id, legal_name').in('user_id', vendorIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const studentIds = [...new Set((refundOrders || []).map((o) => o.student_id).filter(Boolean))];
+  const { data: refundStudents } = studentIds.length
+    ? await supabase.from('student_profiles').select('user_id, full_name').in('user_id', studentIds)
+    : { data: [] };
+
+  const orderById = Object.fromEntries((refundOrders || []).map((o) => [o.id, o]));
+  const vendorById = Object.fromEntries((refundVendors || []).map((v) => [v.user_id, v]));
+  const studentById = Object.fromEntries((refundStudents || []).map((s) => [s.user_id, s]));
+
+  const refunds = reversalRows.map((tx) => {
+    const order = orderById[tx.source_id] || null;
+    const student = order ? studentById[order.student_id] : null;
+    const vendor = vendorById[tx.vendor_id] || null;
+    return {
+      id: tx.id,
+      amount: Math.abs(Number(tx.amount || 0)),
+      createdAt: tx.created_at,
+      orderId: tx.source_id,
+      orderTotal: order?.total ?? null,
+      paymentStatus: order?.payment_status ?? null,
+      cancelledBy: order?.cancelled_by ?? null,
+      reason: order?.cancellation_reason || tx.description || null,
+      cancelledAt: order?.cancelled_at ?? null,
+      vendorName: vendor?.legal_name || 'Unknown vendor',
+      studentName: student?.full_name || 'Unknown student',
+    };
+  });
+
   return (
     <WalletsClient
       vendorWallets={vendorWallets || []}
@@ -121,6 +180,7 @@ export default async function WalletsPage() {
       vendorRequests={vendorRequests || []}
       riderRequests={riderRequests || []}
       revenue={revenue}
+      refunds={refunds}
     />
   );
 }
