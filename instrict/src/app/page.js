@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { TypeAnimation } from "react-type-animation";
-import { BadgeCheck, ShieldCheck, ShoppingBag, Moon, Sun, Search, Sparkles, Lock } from "lucide-react";
+import { BadgeCheck, ShieldCheck, ShoppingBag, Moon, Sun, Search, Lock, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "@/components/theme-provider";
 import {
@@ -23,6 +23,27 @@ import Image from "next/image";
 // school is on the roadmap) but rendered locked/unselectable, badged
 // "Coming soon". Flipping a new campus on later is just changing this set.
 const LIVE_CAMPUS_SLUGS = new Set(["ui"]);
+
+// Safe localStorage wrappers. Private-browsing Safari, in-app webviews
+// (Instagram/TikTok/Facebook browser), and some managed browsers either
+// throw on setItem or silently refuse to persist. Without these guards
+// a thrown error inside handleSelect kills the whole click handler before
+// setCampus/router.push ever run, so selecting a campus does nothing.
+function safeGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Motion Variants for spring physics transitions
 const springTransition = { type: "spring", stiffness: 100, damping: 15 };
@@ -49,14 +70,19 @@ export default function CampusEntry() {
   const [search, setSearch] = useState("");
   const [campuses, setCampuses] = useState([]);
   const [loadingCampuses, setLoadingCampuses] = useState(true);
+  const [navigating, setNavigating] = useState(false);
+  const [notice, setNotice] = useState(null);
   const setCampus = useCampusStore((state) => state.setCampus);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
 
-    const savedCampus = localStorage.getItem("selected_campus");
-    if (savedCampus) {
+    const savedCampus = safeGet("selected_campus");
+    // Only trust the saved slug if it's still in the live set. A stale or
+    // corrupted value should fall through to the picker, not redirect to
+    // a dead route.
+    if (savedCampus && LIVE_CAMPUS_SLUGS.has(savedCampus)) {
       setCampus(savedCampus);
       router.prefetch(`/campus/${savedCampus}`);
       router.replace(`/campus/${savedCampus}`);
@@ -107,9 +133,28 @@ export default function CampusEntry() {
   );
 
   const handleSelect = (slug) => {
-    if (!slug || !LIVE_CAMPUS_SLUGS.has(slug)) return; // guard: locked campuses aren't selectable
+    if (!slug) return;
 
-    localStorage.setItem("selected_campus", slug);
+    if (!LIVE_CAMPUS_SLUGS.has(slug)) {
+      // Previously a silent no-op here. If the Combobox primitive doesn't
+      // fully block clicks on disabled items, this made "coming soon"
+      // campuses look completely broken with zero feedback.
+      const campus = campuses.find((c) => c.slug === slug);
+      setNotice(`${campus?.name ?? "That campus"} is not live yet. Coming soon.`);
+      return;
+    }
+
+    setNotice(null);
+    setNavigating(true);
+
+    const saved = safeSet("selected_campus", slug);
+    if (!saved) {
+      // Storage is blocked (private browsing, restricted webview, etc).
+      // Still let the user through, they just won't be remembered on
+      // their next visit and will see the picker again.
+      console.warn("Could not persist selected_campus to localStorage");
+    }
+
     setCampus(slug);
     router.push(`/campus/${slug}`);
   };
@@ -127,39 +172,39 @@ export default function CampusEntry() {
         <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
           <div className="flex items-center gap-1 font-black tracking-tight text-xl text-foreground">
              <div className="relative h-6 w-6 overflow-hidden rounded-md flex items-center justify-center transition-transform duration-500 group-hover:rotate-[15deg]">
-                                             <Image
-                                               src="/logo.svg" 
-                                               alt="Instrict Logo" 
-                                               width={20} 
-                                               height={18} 
-                                               className="object-contain"
-                                             />
-                                           </div> 
+                <Image
+                  src="/logo.svg"
+                  alt="Instrict Logo"
+                  width={20}
+                  height={18}
+                  className="object-contain"
+                />
+             </div>
             <span className="text-xl">Instrict<span className="text-primary">Marketplace</span></span>
           </div>
 
           <motion.button
-  onClick={toggleTheme}
-  className="relative flex items-center w-14 h-8 rounded-full border border-border/40 bg-background/60 backdrop-blur-md shadow-sm px-1 transition-colors"
-  aria-label="Toggle theme"
->
-  {/* Track icons (static, sit behind the sliding thumb) */}
-  <Sun className="absolute left-1.5 w-3.5 h-3.5 text-amber-400" />
-  <Moon className="absolute right-1.5 w-3.5 h-3.5 text-indigo-300" />
+            onClick={toggleTheme}
+            className="relative flex items-center w-14 h-8 rounded-full border border-border/40 bg-background/60 backdrop-blur-md shadow-sm px-1 transition-colors"
+            aria-label="Toggle theme"
+          >
+            {/* Track icons (static, sit behind the sliding thumb) */}
+            <Sun className="absolute left-1.5 w-3.5 h-3.5 text-amber-400" />
+            <Moon className="absolute right-1.5 w-3.5 h-3.5 text-indigo-300" />
 
-  {/* Sliding thumb */}
-  <motion.div
-    className="w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center z-10"
-    animate={{ x: theme === "dark" ? 24 : 0 }}
-    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-  >
-    {theme === "dark" ? (
-      <Moon className="w-3.5 h-3.5 text-indigo-400" />
-    ) : (
-      <Sun className="w-3.5 h-3.5 text-amber-500" />
-    )}
-  </motion.div>
-</motion.button>
+            {/* Sliding thumb */}
+            <motion.div
+              className="w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center z-10"
+              animate={{ x: theme === "dark" ? 24 : 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            >
+              {theme === "dark" ? (
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              ) : (
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+              )}
+            </motion.div>
+          </motion.button>
         </div>
 
         {/* Interactive Form Container */}
@@ -186,8 +231,12 @@ export default function CampusEntry() {
                   placeholder="Search universities..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-14 pl-11 pr-4 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all shadow-sm group-hover:border-border/80"
+                  disabled={navigating}
+                  className="w-full h-14 pl-11 pr-4 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all shadow-sm group-hover:border-border/80 disabled:opacity-60"
                 />
+                {navigating && (
+                  <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
+                )}
               </div>
 
               <ComboboxContent className="w-[var(--anchor-width)] mt-2 bg-background/80 backdrop-blur-xl border border-border/60 rounded-xl shadow-xl shadow-shadow/5 p-1.5 overflow-hidden z-50 animate-in fade-in-50 slide-in-from-top-1">
@@ -229,6 +278,11 @@ export default function CampusEntry() {
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
+            {notice && (
+              <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                {notice}
+              </p>
+            )}
           </motion.div>
         </motion.div>
       </section>
