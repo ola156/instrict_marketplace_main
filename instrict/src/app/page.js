@@ -84,8 +84,18 @@ export default function CampusEntry() {
     // a dead route.
     if (savedCampus && LIVE_CAMPUS_SLUGS.has(savedCampus)) {
       setCampus(savedCampus);
-      router.prefetch(`/campus/${savedCampus}`);
-      router.replace(`/campus/${savedCampus}`);
+
+      // Deferred to the next tick on purpose. Dispatching router.replace()
+      // synchronously in the very first effect (i.e. the same commit the
+      // component mounts in) races with Next's App Router action queue,
+      // which can still be initializing at that exact instant. In dev,
+      // if Fast Refresh's own hmrRefresh dispatch lands in that same
+      // window, Next throws "Router action dispatched before
+      // initialization." Pushing this to a microtask lets the router
+      // finish initializing first, without any visible delay to the user.
+      queueMicrotask(() => {
+        router.replace(`/campus/${savedCampus}`);
+      });
     } else {
       setCheckingAuth(false);
     }
