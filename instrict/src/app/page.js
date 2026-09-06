@@ -72,6 +72,7 @@ export default function CampusEntry() {
   const [loadingCampuses, setLoadingCampuses] = useState(true);
   const [navigating, setNavigating] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [campusesError, setCampusesError] = useState(null);
   const setCampus = useCampusStore((state) => state.setCampus);
   const router = useRouter();
 
@@ -106,23 +107,40 @@ export default function CampusEntry() {
   }, []);
 
   const fetchCampuses = async () => {
-    const { data, error } = await supabase
-      .from("campuses")
-      .select("id, name, slug")
-      .order("name", { ascending: true });
+    // try/catch/finally is required here, not just tidy: if the Supabase
+    // client throws (missing/invalid env vars is the classic case — works
+    // locally off .env.local, then silently fails once deployed because
+    // the same vars were never added to the hosting provider's project
+    // settings) the function used to bail out before ever calling
+    // setLoadingCampuses(false), leaving the skeleton loaders spinning
+    // forever with no visible error. The finally block guarantees the
+    // loading state always resolves one way or another.
+    try {
+      const { data, error } = await supabase
+        .from("campuses")
+        .select("id, name, slug")
+        .order("name", { ascending: true });
 
-    if (!error && data) {
+      if (error) throw error;
+
       // Live campus floats to the top so it's the obvious first option,
       // rather than getting lost alphabetically among "coming soon" ones.
-      const sorted = [...data].sort((a, b) => {
+      const sorted = [...(data ?? [])].sort((a, b) => {
         const aLive = LIVE_CAMPUS_SLUGS.has(a.slug);
         const bLive = LIVE_CAMPUS_SLUGS.has(b.slug);
         if (aLive !== bLive) return aLive ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
       setCampuses(sorted);
+      setCampusesError(null);
+    } catch (err) {
+      console.error("Failed to load campuses:", err);
+      setCampusesError(
+        "We couldn't load the campus list. Please refresh, or check back shortly."
+      );
+    } finally {
+      setLoadingCampuses(false);
     }
-    setLoadingCampuses(false);
   };
 
   if (!mounted) return null;
@@ -256,6 +274,10 @@ export default function CampusEntry() {
                       {[...Array(4)].map((_, i) => (
                         <div key={i} className="h-11 rounded-lg bg-muted/60 animate-pulse" />
                       ))}
+                    </div>
+                  ) : campusesError ? (
+                    <div className="py-6 text-center text-sm text-red-500 dark:text-red-400 tracking-tight px-3">
+                      {campusesError}
                     </div>
                   ) : filteredCampuses.length > 0 ? (
                     filteredCampuses.map((campus) => {
