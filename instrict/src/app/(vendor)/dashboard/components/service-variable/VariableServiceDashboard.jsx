@@ -31,7 +31,7 @@ const sectionTitle = {
 // sections where the vendor is actively managing live work. Wallet,
 // Settings, Community, and Notifications have nothing to do with whether
 // the store is open right now, so the banner is noise there.
-const STORE_BANNER_SECTIONS = ['overview', 'quotes', 'projects', 'portfolio', 'calendar'];
+const STORE_BANNER_SECTIONS = ['overview', 'projects', 'portfolio', 'calendar'];
 
 export default function VariableServiceDashboard({ vendor, activeSection, onSectionChange, onVendorUpdate, isSuspended = false }) {
   const supabase = createClient();
@@ -82,8 +82,7 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
 
   const bottomNav = [
     { label: 'Home',      section: 'overview',  icon: LayoutDashboard },
-    { label: 'Quotes',    section: 'quotes',    icon: MessageSquare },
-    { label: 'Projects',  section: 'projects',  icon: Briefcase },
+    { label: 'Portfolio',  section: 'portfolio',  icon: Briefcase },
     { label: 'Wallet',    section: 'wallet',    icon: Wallet },
     { label: 'Alerts',    section: 'notifications', icon: Bell, badge: unreadCount },
   ];
@@ -95,7 +94,6 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
       // notifications, and community are read/account sections and don't
       // take the prop (mirrors the store-banner section split above).
       case 'overview':      return <VariableServiceOverview vendorUserId={vendor.user_id} />;
-      case 'quotes':        return <QuoteRequests vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'projects':      return <ActiveProjects vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'portfolio':     return <Portfolio vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
       case 'calendar':      return <AvailabilityCalendar vendorUserId={vendor.user_id} isSuspended={isSuspended} />;

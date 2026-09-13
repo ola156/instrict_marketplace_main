@@ -169,17 +169,17 @@ export default function VendorOnboarding() {
     retail: [
       'Gadgets & Tech Accessories', 'Thrift & Fashion Clothes',
       'Footwear & Sneakers', 'Groceries & Provisions', 'Stationery & Textbooks',
-      'Cosmetics & Skincare', 'Beddings & Room Decor', 'Perfumes & Oils'
+      'Cosmetics & Skincare', 'Beddings & Room Decor', 'Perfumes & Oils', 'Bags & Luggage', 'Watches & Jewelry', 'Sportswear & Equipment', 'Toys & Games'
     ],
     canteen: [
-      'Swallow & Native Soups', 'Rice & Fast Food Chains', 'Pastries & Bakers',
+      'Swallow & Native Soups', 'Fast Food Chains', 'Pastries & Bakers',
       'Smoothies & Ice Creams', 'Healthy Meals & Salads', 'Grills, Shawarma & Suya',
       'Breakfast Hubs', 'Soft Drinks & Mocktails'
     ],
     service: [
       'Academic Tutor', 'Printing & Photocopying', 'Graphic Designer',
       'UI/UX & Web Developer', 'Laundry & Dry Cleaning', 'Logistics & Campus Errands',
-      'Hairstylist & Barbering', 'Gadget Repair & Software Flashing', 'Photography & Videography'
+      'Hairstylist & Barbering', 'Gadget Repair & Software Flashing', 'Photography & Videography','Makeup Artist', 'Event Planner & Decorator', 'Campus DJ & Music Producer'
     ]
   };
 
