@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Ban, AlertTriangle, ShieldAlert, ChevronLeft } from 'lucide-react';
-import CanteenStore from './components/CanteenStore';
-import RetailStore from './components/RetailStore';
-import ServiceStore from './components/ServiceStore';
+import CanteenStore from '../[slug]/components/CanteenStore';
+import RetailStore from '../[slug]/components/RetailStore';
+import ServiceStore from '../[slug]/components/ServiceStore';
 
 const MIN_CATALOGUE_ITEMS = 2;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Returns a Supabase query builder for counting this vendor's catalogue,
 // or null if the category isn't recognized. Kept in one place so the three
@@ -43,7 +44,7 @@ function buildCatalogueQuery(supabase, vendor) {
 }
 
 export default function StorePage() {
-  const { user_id } = useParams();
+  const { slug } = useParams();
   const router = useRouter();
   const supabase = createClient();
 
@@ -52,19 +53,31 @@ export default function StorePage() {
   const [eligible, setEligible] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchData(); }, [user_id]);
+  useEffect(() => { fetchData(); }, [slug]);
 
   const fetchData = async () => {
+    // Legacy links (shared before slugs existed) point at the raw user_id.
+    // Look up by whichever column the param actually matches.
+    const isLegacyIdLink = UUID_RE.test(slug);
+
     const [{ data: { user } }, vendorRes] = await Promise.all([
       supabase.auth.getUser(),
       supabase
         .from('vendor_profiles')
-        .select('user_id,legal_name,avatar_url,banner_url,is_open,category,sub_categories,support_phone,account_status,approved')
-        .eq('user_id', user_id)
+        .select('user_id,legal_name,slug,avatar_url,banner_url,is_open,category,sub_categories,support_phone,account_status,approved')
+        .eq(isLegacyIdLink ? 'user_id' : 'slug', slug)
         .maybeSingle(),
     ]);
 
     const vendorData = vendorRes.data || null;
+
+    // Canonicalize: bounce old UUID links to the slug URL so links people
+    // copy going forward are always the readable version.
+    if (vendorData && isLegacyIdLink && vendorData.slug) {
+      router.replace(`/store/${vendorData.slug}`);
+      return;
+    }
+
     setVendor(vendorData);
 
     const studentCheck = user

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import ImageUpload, { ImagePlaceholder } from './ImageUpload';
-import { Store, Phone, Clock, MapPin, Save, CheckCircle2, Building2, Moon } from 'lucide-react';
+import { Store, Phone, Clock, MapPin, Save, CheckCircle2, Building2, Moon, Copy, Check, ExternalLink, Share2 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
 function Section({ title, description, children }) {
@@ -44,10 +44,12 @@ export default function VendorSettings({ vendor, onUpdate }) {
     banner_url: '',
     campus_id: '',
     current_zone_id: '',
+    slug: '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // All campuses, for the switcher dropdown
   const [campuses, setCampuses] = useState([]);
@@ -72,6 +74,7 @@ export default function VendorSettings({ vendor, onUpdate }) {
         banner_url: vendor.banner_url || '',
         campus_id: vendor.campus_id || '',
         current_zone_id: vendor.current_zone_id || '',
+        slug: vendor.slug || '',
       });
     }
   }, [vendor]);
@@ -114,6 +117,42 @@ export default function VendorSettings({ vendor, onUpdate }) {
     setForm(p => ({ ...p, campus_id: newCampusId, current_zone_id: '' }));
   };
 
+  // Slugs are constrained to lowercase letters, numbers, and single hyphens
+  // since this becomes part of a public URL (/store/[slug]).
+  const handleSlugChange = (value) => {
+    const clean = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+    set('slug', clean);
+  };
+
+  const storeUrl = form.slug && typeof window !== 'undefined'
+    ? `${window.location.origin}/store/${form.slug}`
+    : '';
+
+  const handleCopyLink = async () => {
+    if (!storeUrl) return;
+    try {
+      await navigator.clipboard.writeText(storeUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1800);
+    } catch (err) {
+      // clipboard blocked — no-op
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (!storeUrl) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: form.legal_name, url: storeUrl });
+      } else {
+        handleCopyLink();
+      }
+    } catch (err) {
+      // AbortError when the person cancels the native share sheet — not a
+      // real failure, nothing to show for it.
+    }
+  };
+
   const handleSave = async () => {
     if (!form.legal_name) { setError('Store name is required.'); return; }
     if (!form.campus_id) { setError('Please select your campus.'); return; }
@@ -137,6 +176,7 @@ export default function VendorSettings({ vendor, onUpdate }) {
         banner_url: form.banner_url || null,
         campus_id: form.campus_id,
         current_zone_id: form.current_zone_id || null,
+        slug: form.slug || null,
       })
       .eq('user_id', vendor.user_id);
 
@@ -189,19 +229,19 @@ export default function VendorSettings({ vendor, onUpdate }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ImageUpload
-  value={form.avatar_url}
-  onChange={url => set('avatar_url', url)}
-  label="Profile Photo"
-  optional={true}
-  aspect={2.5}
-/>
-             <ImageUpload
-  value={form.banner_url}
-  onChange={url => set('banner_url', url)}
-  label="Banner Image"
-  optional={true}
-  aspect={2.5}
-/>
+                value={form.avatar_url}
+                onChange={url => set('avatar_url', url)}
+                label="Profile Photo"
+                optional={true}
+                aspect={2.5}
+              />
+              <ImageUpload
+                value={form.banner_url}
+                onChange={url => set('banner_url', url)}
+                label="Banner Image"
+                optional={true}
+                aspect={2.5}
+              />
             </div>
           </Section>
 
@@ -230,6 +270,57 @@ export default function VendorSettings({ vendor, onUpdate }) {
                 className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all resize-none"
               />
             </Field>
+          </Section>
+
+          {/* Store Link */}
+          <Section title="Store Link" description="Your public page students can visit and order from">
+            <Field label="Store URL Slug">
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  value={form.slug}
+                  onChange={e => handleSlugChange(e.target.value)}
+                  placeholder="e.g. subomi-foods"
+                  className={`${inputClass} pl-9`}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Only lowercase letters, numbers, and hyphens. This becomes your store's web address.
+              </p>
+            </Field>
+
+            {form.slug && (
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                <p className="flex-1 text-xs font-bold text-slate-600 dark:text-slate-300 truncate">
+                  {storeUrl}
+                </p>
+                <button
+                  onClick={handleCopyLink}
+                  title="Copy link"
+                  className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-900 transition-colors"
+                >
+                  {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+                <a
+                  href={storeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open store page"
+                  className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-900 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
+
+            <button
+              onClick={handleShareLink}
+              disabled={!form.slug}
+              className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              {linkCopied ? 'Link copied' : 'Share store link'}
+            </button>
           </Section>
         </div>
 
@@ -352,15 +443,15 @@ export default function VendorSettings({ vendor, onUpdate }) {
               </div>
             </div>
             <div className="flex items-center gap-3">
-  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-400">
-    <Moon className="w-4 h-4" />
-  </div>
-  <div className="flex-1">
-    <p className="text-xs font-black text-slate-900 dark:text-white">Appearance</p>
-    <p className="text-[11px] text-slate-400">Light or dark mode</p>
-  </div>
-  <ThemeToggle />
-</div>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-400">
+                <Moon className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-black text-slate-900 dark:text-white">Appearance</p>
+                <p className="text-[11px] text-slate-400">Light or dark mode</p>
+              </div>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>

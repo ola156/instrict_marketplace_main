@@ -51,9 +51,7 @@ const serviceFixedNav = [
 
 const serviceVariableNav = [
   { label: 'Overview',      icon: LayoutDashboard, section: 'overview' },
-  { label: 'Active Projects',icon: Briefcase,      section: 'projects' },
   { label: 'Portfolio',     icon: ImageIcon,       section: 'portfolio' },
-  { label: 'Wallet',        icon: Wallet,          section: 'wallet' },
   { label: 'Notifications', icon: Bell,            section: 'notifications' },
   { label: 'Community',     icon: Rss,             section: 'community' },
   { label: 'Settings',      icon: Settings,        section: 'settings' }, 

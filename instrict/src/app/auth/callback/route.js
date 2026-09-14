@@ -6,13 +6,18 @@ export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
-  if (!code) {
-    return NextResponse.redirect(`${origin}/auth/auth-error`);
-  }
-
+  // Read cookies up front so both error paths below can carry the role
+  // through to /auth/auth-error — without this, any failure here always
+  // fell back to the student login regardless of which portal the person
+  // started from.
   const cookieStore = await cookies();
   const pendingRoleFromCookie = cookieStore.get('pending_role')?.value;
   const campusFromCookie = cookieStore.get('pending_campus')?.value;
+  const fallbackRole = pendingRoleFromCookie || 'user';
+
+  if (!code) {
+    return NextResponse.redirect(`${origin}/auth/auth-error?role=${fallbackRole}`);
+  }
 
   const supabase = await createClient();
 
@@ -20,7 +25,7 @@ export async function GET(request) {
     await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError || !sessionData?.user) {
-    return NextResponse.redirect(`${origin}/auth/auth-error`);
+    return NextResponse.redirect(`${origin}/auth/auth-error?role=${fallbackRole}`);
   }
 
   const user = sessionData.user;

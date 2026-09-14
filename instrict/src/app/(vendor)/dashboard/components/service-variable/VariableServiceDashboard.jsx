@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, MessageSquare, Briefcase, Image as ImageIcon, Calendar, Wallet, Bell } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Briefcase, Image as ImageIcon, Settings, Wallet, Bell } from 'lucide-react';
 import StoreStatusBanner from '../shared/StoreStatusBanner';
 import VariableServiceOverview from './VariableServiceOverview';
 
-import ActiveProjects from './ActiveProjects';
+
 
 import Portfolio from '../service-fixed/Portfolio';
 import VendorSettings from '../shared/VendorSettings';
@@ -18,7 +18,6 @@ import HelpDesk from '@/components/HelpDesk';
 
 const sectionTitle = {
   overview:      'Dashboard',
-  projects:      'Active Projects',
   portfolio:     'Portfolio',
   wallet:        'Wallet',
   notifications: 'Notifications',
@@ -83,7 +82,7 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
   const bottomNav = [
     { label: 'Home',      section: 'overview',  icon: LayoutDashboard },
     { label: 'Portfolio',  section: 'portfolio',  icon: Briefcase },
-    { label: 'Wallet',    section: 'wallet',    icon: Wallet },
+    { label: 'Settings',    section: 'settings',    icon: Settings },
     { label: 'Alerts',    section: 'notifications', icon: Bell, badge: unreadCount },
   ];
 
@@ -94,10 +93,10 @@ export default function VariableServiceDashboard({ vendor, activeSection, onSect
       // notifications, and community are read/account sections and don't
       // take the prop (mirrors the store-banner section split above).
       case 'overview':      return <VariableServiceOverview vendorUserId={vendor.user_id} />;
-      case 'projects':      return <ActiveProjects vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
+     
       case 'portfolio':     return <Portfolio vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
-      case 'calendar':      return <AvailabilityCalendar vendorUserId={vendor.user_id} isSuspended={isSuspended} />;
-      case 'wallet':        return <VendorWallet vendor={vendor} isSuspended={isSuspended} />;
+     
+   
       case 'notifications': return <VendorNotifications vendor={vendor} onNavigate={handleNotificationNavigate} sectionMap={{ order: 'projects', payment: 'wallet' }} />;
       case 'community':     return <CommunityFeed authorType="vendor" isSuspended={isSuspended} highlightPostId={highlightPostId} />;
       case 'settings':      return <VendorSettings vendor={vendor} onUpdate={onVendorUpdate} />;

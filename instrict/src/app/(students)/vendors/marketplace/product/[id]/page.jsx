@@ -131,7 +131,7 @@ export default function ProductDescriptionPage() {
       setProduct(item);
       const [{ data: v }, { data: vr }, { data: imgs }] = await Promise.all([
         supabase.from('vendor_profiles')
-          .select('user_id,legal_name,avatar_url,category,is_open,landmark,account_status')
+          .select('user_id,legal_name,slug,avatar_url,category,is_open,landmark,account_status')
           .eq('user_id', item.vendor_id)
           .single(),
         supabase.from('product_variants')
@@ -597,7 +597,7 @@ export default function ProductDescriptionPage() {
           {vendor && (
             <div className="py-5">
               <Link
-                href={`/store/${vendor.user_id}`}
+                href={`/store/${vendor.slug}`}
                 className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-800 transition-colors group"
               >
                 <div className="relative shrink-0">

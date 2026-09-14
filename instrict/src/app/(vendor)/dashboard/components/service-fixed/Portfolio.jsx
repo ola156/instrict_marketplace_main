@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import ImageUpload from '../shared/ImageUpload';
-import { Plus, Trash2, Image as ImageIcon, X, Save, Ban } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, X, Save, Ban, Pencil } from 'lucide-react';
 import VerificationGate from '@/components/verification/VerificationGate';
 
 export default function Portfolio({ vendorUserId, isSuspended = false }) {
@@ -11,6 +11,7 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ image_url: '', description: '', price_tag: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -27,26 +28,67 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
     setLoading(false);
   };
 
-  const addItem = async () => {
+  const openAddForm = () => {
+    setEditingId(null);
+    setForm({ image_url: '', description: '', price_tag: '' });
+    setError('');
+    setShowForm(true);
+  };
+
+  const openEditForm = (item) => {
+    if (isSuspended) return;
+    setEditingId(item.id);
+    setForm({
+      image_url: item.image_url || '',
+      description: item.description || '',
+      price_tag: item.price_tag != null ? String(item.price_tag) : '',
+    });
+    setError('');
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ image_url: '', description: '', price_tag: '' });
+    setError('');
+  };
+
+  const saveItem = async () => {
     // Defense in depth: block the write even if a stale UI let the form open.
     if (isSuspended) { setError('Your store is suspended. Contact support to resume portfolio changes.'); return; }
     if (!form.image_url) { setError('Please upload a photo of your work.'); return; }
     setError('');
     setSaving(true);
 
-    const { error: insertError } = await supabase
-      .from('portfolio_items')
-      .insert({
-        vendor_id: vendorUserId,
-        image_url: form.image_url,
-        description: form.description || null,
-        price_tag: form.price_tag || null,
-      });
+    if (editingId) {
+      const { error: updateError } = await supabase
+        .from('portfolio_items')
+        .update({
+          image_url: form.image_url,
+          description: form.description || null,
+          price_tag: form.price_tag || null,
+        })
+        .eq('id', editingId)
+        .eq('vendor_id', vendorUserId);
 
-    setSaving(false);
-    if (insertError) { setError(insertError.message); return; }
-    setForm({ image_url: '', description: '', price_tag: '' });
-    setShowForm(false);
+      setSaving(false);
+      if (updateError) { setError(updateError.message); return; }
+    } else {
+      const { error: insertError } = await supabase
+        .from('portfolio_items')
+        .insert({
+          vendor_id: vendorUserId,
+          image_url: form.image_url,
+          description: form.description || null,
+          price_tag: form.price_tag || null,
+        });
+
+      setSaving(false);
+      if (insertError) { setError(insertError.message); return; }
+    }
+
+    closeForm();
     fetchItems();
   };
 
@@ -72,7 +114,7 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
         ) : (
           <VerificationGate role="vendor" userId={vendorUserId} action="add portfolio items" variant="inline">
             <button
-              onClick={() => setShowForm(true)}
+              onClick={openAddForm}
               className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black tracking-tight flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" /> Add Work
@@ -97,12 +139,20 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
             <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden group relative">
               <img src={item.image_url} alt={item.description || 'Portfolio work'} className="w-full h-32 object-cover" />
               {!isSuspended && (
-                <button
-                  onClick={() => deleteItem(item.id)}
-                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 text-white rounded-lg flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={() => openEditForm(item)}
+                    className="w-7 h-7 bg-black/60 hover:bg-black/80 text-white rounded-lg flex items-center justify-center"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="w-7 h-7 bg-black/60 hover:bg-black/80 text-white rounded-lg flex items-center justify-center"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
               <div className="p-3 space-y-1">
                 {item.description && (
@@ -121,8 +171,10 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
           <div className="w-full sm:max-w-md bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white">Add Portfolio Item</h3>
-              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                {editingId ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
+              </h3>
+              <button onClick={closeForm} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -150,11 +202,11 @@ export default function Portfolio({ vendorUserId, isSuspended = false }) {
               </div>
               {error && <p className="text-[11px] font-bold text-rose-500">{error}</p>}
               <button
-                onClick={addItem}
+                onClick={saveItem}
                 disabled={saving}
                 className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-black tracking-tight flex items-center justify-center gap-2"
               >
-                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save</>}
+                {saving ? 'Saving...' : <><Save className="w-4 h-4" /> {editingId ? 'Update' : 'Save'}</>}
               </button>
             </div>
           </div>

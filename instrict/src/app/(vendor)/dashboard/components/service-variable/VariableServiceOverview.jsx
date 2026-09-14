@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { MessageSquare, Briefcase, TrendingUp, Calendar } from 'lucide-react';
+import { Image as ImageIcon, MessagesSquare } from 'lucide-react';
 
 function StatCard({ label, value, icon: Icon, color }) {
   return (
@@ -18,46 +18,36 @@ function StatCard({ label, value, icon: Icon, color }) {
   );
 }
 
+// NOTE: assumes community_posts has author_id + author_type columns (matching
+// the authorType="vendor" prop used by <CommunityFeed>). Adjust the .eq()
+// calls below if your actual column names differ.
 export default function VariableServiceOverview({ vendorUserId }) {
   const supabase = createClient();
-  const [stats, setStats] = useState({
-    pendingQuotes: 0,
-    activeProjects: 0,
-    todayRevenue: 0,
-    availableSlots: 0,
-  });
+  const [stats, setStats] = useState({ portfolioCount: 0, communityPostCount: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => { if (vendorUserId) fetchStats(); }, [vendorUserId]);
 
   const fetchStats = async () => {
-    const today = new Date().toISOString().split('T')[0];
-
     const [
-      { count: pendingQuotes },
-      { count: activeProjects },
-      { data: completedToday },
-      { count: availableSlots },
+      { count: portfolioCount },
+      { count: communityPostCount },
     ] = await Promise.all([
-      supabase.from('quote_requests').select('*', { count: 'exact', head: true }).eq('vendor_id', vendorUserId).eq('status', 'pending'),
-      supabase.from('quote_requests').select('*', { count: 'exact', head: true }).eq('vendor_id', vendorUserId).in('status', ['accepted', 'in_progress']),
-      supabase.from('quote_requests').select('quoted_price').eq('vendor_id', vendorUserId).eq('status', 'completed').gte('updated_at', today),
-      supabase.from('availability_slots').select('*', { count: 'exact', head: true }).eq('vendor_id', vendorUserId).eq('is_booked', false).gte('date', today),
+      supabase.from('portfolio_items').select('*', { count: 'exact', head: true }).eq('vendor_id', vendorUserId),
+      supabase.from('community_posts').select('*', { count: 'exact', head: true }).eq('author_id', vendorUserId).eq('author_type', 'vendor'),
     ]);
 
     setStats({
-      pendingQuotes: pendingQuotes || 0,
-      activeProjects: activeProjects || 0,
-      todayRevenue: (completedToday || []).reduce((sum, q) => sum + Number(q.quoted_price || 0), 0),
-      availableSlots: availableSlots || 0,
+      portfolioCount: portfolioCount || 0,
+      communityPostCount: communityPostCount || 0,
     });
     setLoading(false);
   };
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />)}
+      <div className="grid grid-cols-2 gap-4">
+        {[...Array(2)].map((_, i) => <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />)}
       </div>
     );
   }
@@ -66,13 +56,12 @@ export default function VariableServiceOverview({ vendorUserId }) {
     <div className="space-y-5">
       <div>
         <h2 className="text-sm font-black tracking-tight text-slate-900 dark:text-white">Overview</h2>
-        <p className="text-[11px] text-slate-400 mt-0.5">Today's snapshot</p>
+        <p className="text-[11px] text-slate-400 mt-0.5">Your store at a glance</p>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending Quotes" value={stats.pendingQuotes} icon={MessageSquare} color="bg-amber-500/10 text-amber-500" />
-        <StatCard label="Active Projects" value={stats.activeProjects} icon={Briefcase} color="bg-indigo-500/10 text-indigo-500" />
-        <StatCard label="Today's Revenue" value={`₦${stats.todayRevenue.toLocaleString()}`} icon={TrendingUp} color="bg-emerald-500/10 text-emerald-500" />
-        <StatCard label="Open Slots" value={stats.availableSlots} icon={Calendar} color="bg-blue-500/10 text-blue-500" />
+
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard label="Portfolio Items" value={stats.portfolioCount} icon={ImageIcon} color="bg-blue-500/10 text-blue-500" />
+        <StatCard label="Community Posts" value={stats.communityPostCount} icon={MessagesSquare} color="bg-indigo-500/10 text-indigo-500" />
       </div>
     </div>
   );

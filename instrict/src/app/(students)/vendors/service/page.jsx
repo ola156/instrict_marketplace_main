@@ -216,17 +216,17 @@ export default function ServiceDirectory() {
     </div>
   );
 }
-
 function ServiceSkeletonCard() {
   return (
-    <div className="flex flex-col overflow-hidden bg-muted/20 border border-border/40 rounded-2xl p-4 pt-0 space-y-3">
-      <div className="w-full h-36 -mx-4 relative bg-muted/60" />
-      <ProductSkeleton className="w-10 h-10 rounded-xl bg-muted -mt-5 relative z-10" />
-      <ProductSkeleton className="h-4 w-3/4 bg-muted/50" />
-      <ProductSkeleton className="h-3 w-1/2 bg-muted/30" />
-      <div className="pt-3 border-t border-border/20 flex justify-between items-center">
-        <ProductSkeleton className="h-3 w-16 bg-muted/40" />
-        <ProductSkeleton className="h-3 w-12 bg-muted/40" />
+    <div className="flex flex-col overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800/50 animate-pulse">
+      <div className="w-full h-36 bg-slate-200 dark:bg-slate-800" />
+      <div className="p-4 space-y-3">
+        <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-800" />
+        <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-800" />
+        <div className="flex items-center justify-between pt-3">
+          <div className="h-3 w-14 rounded bg-slate-200 dark:bg-slate-800" />
+          <div className="h-3 w-10 rounded bg-slate-200 dark:bg-slate-800" />
+        </div>
       </div>
     </div>
   );
