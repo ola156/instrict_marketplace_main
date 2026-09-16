@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ShoppingBag,
@@ -15,6 +15,7 @@ import {
   MapPin,
   Clock,
   Truck,
+  ChevronDown,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { isValidPhoneNumber } from 'libphonenumber-js';
@@ -87,6 +88,10 @@ export default function VendorOnboarding() {
 
   const [subCategorySearch, setSubCategorySearch] = useState('');
 
+  const [zoneSearch, setZoneSearch] = useState('');
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const zoneBoxRef = useRef(null);
+
   useEffect(() => {
     (async () => {
       setCampusLoading(true);
@@ -139,6 +144,17 @@ export default function VendorOnboarding() {
       if (!zonesError) setZones(zoneList || []);
       setZonesLoading(false);
     })();
+  }, []);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (zoneBoxRef.current && !zoneBoxRef.current.contains(e.target)) {
+        setZoneOpen(false);
+        setZoneSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
   const categories = [
@@ -198,6 +214,28 @@ export default function VendorOnboarding() {
 
     return filtered;
   }, [profileData.category, profileData.subCategories, subCategorySearch]);
+
+  const selectedZone = useMemo(
+    () => zones.find((z) => z.id === profileData.currentZoneId) || null,
+    [zones, profileData.currentZoneId]
+  );
+
+  const filteredZones = useMemo(() => {
+    const q = zoneSearch.trim().toLowerCase();
+    if (!q) return zones;
+    return zones.filter(
+      (z) =>
+        z.name.toLowerCase().includes(q) ||
+        (z.zone_type || '').toLowerCase().includes(q)
+    );
+  }, [zones, zoneSearch]);
+
+  const pickZone = (zone) => {
+    setProfileData((prev) => ({ ...prev, currentZoneId: zone.id }));
+    setZoneSearch('');
+    setZoneOpen(false);
+    setServerError('');
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -263,7 +301,7 @@ export default function VendorOnboarding() {
         serviceSubtype = allFixed ? 'fixed' : 'variable';
       }
 
-      const selectedZone = zones.find((z) => z.id === profileData.currentZoneId);
+      const zoneForSubmit = zones.find((z) => z.id === profileData.currentZoneId);
 
       const { error: upsertError } = await supabase
         .from('vendor_profiles')
@@ -276,7 +314,7 @@ export default function VendorOnboarding() {
           campus_id: campusId,
           current_zone_id: profileData.currentZoneId,
           store_address: profileData.storeAddress,
-          landmark: selectedZone?.name || null,
+          landmark: zoneForSubmit?.name || null,
           opening_time: profileData.openingTime,
           closing_time: profileData.closingTime,
           fulfillment_method: profileData.fulfillmentMethod,
@@ -425,24 +463,67 @@ export default function VendorOnboarding() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                   Zone / Closest LandMark <span className="text-blue-500">*</span>
                 </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <select
-                    name="currentZoneId"
-                    value={profileData.currentZoneId}
-                    onChange={handleInputChange}
-                    required
-                    disabled={zonesLoading || !campusId}
-                    className="w-full h-11 pl-11 pr-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none disabled:opacity-50"
-                  >
-                    <option value="">
-                      {zonesLoading ? 'Loading zones...' : 'Select your zone'}
-                    </option>
-                    {zones.map((z) => (
-                      <option key={z.id} value={z.id}>{z.name}</option>
-                    ))}
-                  </select>
+
+                <div className="relative" ref={zoneBoxRef}>
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+
+                  {zoneOpen ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={zoneSearch}
+                      onChange={(e) => setZoneSearch(e.target.value)}
+                      placeholder="Search zones e.g. SUB, Faculty, Hostel..."
+                      className="w-full h-11 pl-11 pr-10 rounded-xl border border-blue-500 bg-white dark:bg-slate-900 text-sm outline-none ring-2 ring-blue-500/20 transition-all"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => !zonesLoading && campusId && setZoneOpen(true)}
+                      disabled={zonesLoading || !campusId}
+                      className="w-full h-11 pl-11 pr-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm text-left outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50"
+                    >
+                      <span className={selectedZone ? '' : 'text-slate-400'}>
+                        {zonesLoading
+                          ? 'Loading zones...'
+                          : selectedZone
+                          ? selectedZone.name
+                          : 'Select your zone'}
+                      </span>
+                    </button>
+                  )}
+
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+
+                  {zoneOpen && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+4px)] max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-900 rounded-xl bg-white dark:bg-slate-900 shadow-xl divide-y divide-slate-50 dark:divide-slate-900/50 z-30">
+                      {filteredZones.length === 0 ? (
+                        <p className="px-4 py-3 text-xs text-slate-400">No zone matches that.</p>
+                      ) : (
+                        filteredZones.map((z) => (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => pickZone(z)}
+                            className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800/60 block transition-colors ${
+                              z.id === profileData.currentZoneId
+                                ? 'text-blue-600 dark:text-blue-400 font-bold'
+                                : 'text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {z.name}
+                            {z.zone_type && (
+                              <span className="ml-2 text-[10px] text-slate-400 uppercase tracking-wider">
+                                {z.zone_type}
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
+
                 <p className="text-[10px] text-slate-400">
                   Doubles as your closest landmark — you can update this anytime if you move.
                 </p>
@@ -498,7 +579,7 @@ export default function VendorOnboarding() {
                   >
                     <option value="pickup">Store Pickup Only</option>
                     <option value="delivery">Campus Delivery Only</option>
-                    <option value="both">Both (Pickup & Delivery)</option>
+                    <option value="both">Both (Pickup &amp; Delivery)</option>
                   </select>
                 </div>
               </div>

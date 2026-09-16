@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useCampusStore } from '@/store/useCampusStore';
 import { getCampusFullName } from '@/constants/universities';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import {
-  User, Hash, Phone, MapPin, ArrowRight, CheckCircle2
+  User, Hash, Phone, MapPin, ArrowRight, CheckCircle2, ChevronDown
 } from 'lucide-react';
 
 const inputClass = "w-full h-11 px-4 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all";
@@ -75,6 +75,10 @@ export default function UserOnboarding() {
     phone: '',
   });
 
+  const [zoneSearch, setZoneSearch] = useState('');
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const zoneBoxRef = useRef(null);
+
   useEffect(() => { checkSession(); }, []);
 
   useEffect(() => {
@@ -132,6 +136,17 @@ export default function UserOnboarding() {
     })();
   }, []);
 
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (zoneBoxRef.current && !zoneBoxRef.current.contains(e.target)) {
+        setZoneOpen(false);
+        setZoneSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
   const checkSession = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/auth/student'); return; }
@@ -157,6 +172,28 @@ export default function UserOnboarding() {
   const set = (key, value) => {
     setForm(p => ({ ...p, [key]: value }));
     if (key === 'phone') setPhoneError('');
+  };
+
+  const selectedZone = useMemo(
+    () => zones.find((z) => z.id === form.zone_id) || null,
+    [zones, form.zone_id]
+  );
+
+  const filteredZones = useMemo(() => {
+    const q = zoneSearch.trim().toLowerCase();
+    if (!q) return zones;
+    return zones.filter(
+      (z) =>
+        z.name.toLowerCase().includes(q) ||
+        (z.zone_type || '').toLowerCase().includes(q)
+    );
+  }, [zones, zoneSearch]);
+
+  const pickZone = (zone) => {
+    set('zone_id', zone.id);
+    setZoneSearch('');
+    setZoneOpen(false);
+    setServerError('');
   };
 
   const handleSubmit = async (e) => {
@@ -190,7 +227,7 @@ export default function UserOnboarding() {
     setIsLoading(true);
 
     try {
-      const selectedZone = zones.find((z) => z.id === form.zone_id);
+      const zoneForSubmit = zones.find((z) => z.id === form.zone_id);
 
       const { error: upsertError } = await supabase
         .from('student_profiles')
@@ -198,7 +235,7 @@ export default function UserOnboarding() {
           user_id: user.id,
           full_name: form.full_name,
           matric_number: form.matric_number || null,
-          hostel: selectedZone?.name || null,
+          hostel: zoneForSubmit?.name || null,
           zone_id: form.zone_id,
           delivery_address: form.delivery_address,
           phone: phoneCheck.formatted,
@@ -362,21 +399,65 @@ export default function UserOnboarding() {
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                 Closest Zone <span className="text-blue-500">*</span>
               </label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <select
-                  value={form.zone_id}
-                  onChange={e => set('zone_id', e.target.value)}
-                  disabled={zonesLoading || !campusId}
-                  className={`${inputClass} pl-11 appearance-none disabled:opacity-50`}
-                >
-                  <option value="">
-                    {zonesLoading ? 'Loading zones...' : 'Select the zone closest to you'}
-                  </option>
-                  {zones.map((z) => (
-                    <option key={z.id} value={z.id}>{z.name}</option>
-                  ))}
-                </select>
+
+              <div className="relative" ref={zoneBoxRef}>
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+
+                {zoneOpen ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={zoneSearch}
+                    onChange={(e) => setZoneSearch(e.target.value)}
+                    placeholder="Search zones e.g. Alexander, Faculty, Gate..."
+                    className={`${inputClass} pl-11 pr-10 border-blue-500 ring-2 ring-blue-500/20`}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => !zonesLoading && campusId && setZoneOpen(true)}
+                    disabled={zonesLoading || !campusId}
+                    className={`${inputClass} pl-11 pr-10 text-left disabled:opacity-50`}
+                  >
+                    <span className={selectedZone ? '' : 'text-slate-400'}>
+                      {zonesLoading
+                        ? 'Loading zones...'
+                        : selectedZone
+                        ? selectedZone.name
+                        : 'Select the zone closest to you'}
+                    </span>
+                  </button>
+                )}
+
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+
+                {zoneOpen && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+4px)] max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-900 rounded-xl bg-white dark:bg-slate-900 shadow-xl divide-y divide-slate-50 dark:divide-slate-900/50 z-30">
+                    {filteredZones.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-slate-400">No zone matches that.</p>
+                    ) : (
+                      filteredZones.map((z) => (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() => pickZone(z)}
+                          className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800/60 block transition-colors ${
+                            z.id === form.zone_id
+                              ? 'text-blue-600 dark:text-blue-400 font-bold'
+                              : 'text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {z.name}
+                          {z.zone_type && (
+                            <span className="ml-2 text-[10px] text-slate-400 uppercase tracking-wider">
+                              {z.zone_type}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
